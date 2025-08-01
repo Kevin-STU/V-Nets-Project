@@ -457,11 +457,22 @@
             const intervals = [];
             for (let i = 0; i < group.length - 1; i++) {
                 const ei = group[i].EventType;
+                const ei_occ = group[i].occurrence;
                 const ti = parseFloat(group[i].Timestamp);
+
                 const ej = group[i + 1].EventType;
+                const ej_occ = group[i + 1].occurrence;
                 const tj = parseFloat(group[i + 1].Timestamp);
-                const delta = Math.round((tj - ti) * 100) / 100;
-                intervals.push([ei, ej, delta]);
+
+                const delta = Math.round((tj - ti) * 1000) / 1000;
+
+                intervals.push({
+                    from: ei,
+                    fromOcc: ei_occ,
+                    to: ej,
+                    toOcc: ej_occ,
+                    delta: delta
+                });
             }
             return intervals;
         }
@@ -469,32 +480,36 @@
         // Aggregate intervals across all sequences to find min/max for each event pair
         function aggregateIntervals(grouped) {
             const intervalMap = new Map();
-            
-            // Collect all intervals from all sequences
+
             Object.entries(grouped).forEach(([seqId, group]) => {
                 const intervals = calculateSequenceIntervals(group);
-                intervals.forEach(([ei, ej, delta]) => {
-                    const key = `${ei}->${ej}`;
+                intervals.forEach(({ from, fromOcc, to, toOcc, delta }) => {
+                    const key = `${from}^${fromOcc}->${to}^${toOcc}`;
                     if (!intervalMap.has(key)) {
                         intervalMap.set(key, []);
                     }
                     intervalMap.get(key).push(delta);
                 });
             });
-            
-            // Calculate min/max for each event pair
+
             const aggregatedIntervals = [];
             intervalMap.forEach((deltas, key) => {
-                const [ei, ej] = key.split('->');
+                const [fromLabel, toLabel] = key.split('->');
                 const minDelta = Math.min(...deltas);
                 const maxDelta = Math.max(...deltas);
-                aggregatedIntervals.push([ei, ej, [minDelta, maxDelta]]);
+                aggregatedIntervals.push({
+                    from: fromLabel.split('^')[0],
+                    fromOcc: fromLabel.split('^')[1],
+                    to: toLabel.split('^')[0],
+                    toOcc: toLabel.split('^')[1],
+                    interval: [minDelta, maxDelta]
+                });
             });
-            
+
             return aggregatedIntervals;
         }
 
-        // Group data by SequenceID
+
         function groupBySequenceID(data) {
             const groups = {};
             data.forEach(row => {
@@ -504,14 +519,21 @@
                 }
                 groups[seqId].push(row);
             });
-            
-            // Sort each group by timestamp
+
+            // Trier chaque séquence par timestamp et numéroter les occurrences
             Object.keys(groups).forEach(seqId => {
-                groups[seqId].sort((a, b) => parseFloat(a.Timestamp) - parseFloat(b.Timestamp));
+                const group = groups[seqId].sort((a, b) => parseFloat(a.Timestamp) - parseFloat(b.Timestamp));
+                const occurrenceCounter = {};
+                group.forEach(row => {
+                    const event = row.EventType;
+                    occurrenceCounter[event] = (occurrenceCounter[event] || 0) + 1;
+                    row.occurrence = occurrenceCounter[event];  // <-- ajout ici
+                });
             });
-            
+
             return groups;
         }
+
 
         // Main VNDA algorithm
         function vnda(sequences, constraints = null) {
@@ -547,7 +569,7 @@
             
             // Calculate aggregated temporal constraints
             let T = aggregateIntervals(grouped);
-            
+
             // Apply user-defined constraints if provided
             const constraintBasedEdges = new Set();
             if (constraints) {
@@ -636,12 +658,13 @@
                     end: END.has(event),
                     absence_prob: eventAbsenceProb[event] || 0
                 })),
-                edges: T.map(([ei, ej, [iMinus, iPlus]]) => ({
-                    source: ei,
-                    target: ej,
-                    label: `${ei}^1[${iMinus},${iPlus}]^1${ej}`,
-                    constraint_based: constraintBasedEdges.has(`${ei},${ej}`)
+                edges: T.map(({ from, fromOcc, to, toOcc, interval }) => ({
+                    source: from,
+                    target: to,
+                    label: `${from}^${fromOcc}[${interval[0]},${interval[1]}]^${toOcc}${to}`,
+                    constraint_based: constraintBasedEdges.has(`${from},${to}`)
                 }))
+
             };
             
             return {
@@ -662,8 +685,8 @@
         function formatTextualOutput(vnet) {
             const lines = ["V-net Definition:"];
             lines.push(`E = {${vnet.E.join(', ')}}`);
-            lines.push("T = {" + vnet.T.map(([ei, ej, [iMinus, iPlus]]) => 
-                `${ei}^1[${iMinus},${iPlus}]^1${ej}`).join(', ') + "}");
+            lines.push("T = {" + vnet.T.map(({ from, fromOcc, to, toOcc, interval }) => 
+                `${from}^${fromOcc}[${interval[0]},${interval[1]}]^${toOcc}${to}`).join(', ') + "}");
             lines.push(`Frec = {${Object.entries(vnet.Frec).map(([k, v]) => `${k}: ${v}`).join(', ')}}`);
             lines.push("AbsenceProb = {" + Object.entries(vnet.AbsenceProb).map(([k, v]) => `${k}: ${v}`).join(', ') + "}");
             lines.push(`R = {${vnet.R.join(', ')}}`);
