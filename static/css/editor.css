@@ -99,8 +99,17 @@
 }
 
 .menu-icon {
-    width: 24px;
-    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
 }
 
 .menu-label {
@@ -1376,15 +1385,22 @@
 }
 
 .check-icon {
-    font-size: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .validation-checks li.passed .check-icon {
-    color: var(--success-color);
+    background-color: #d4edda;
+    color: #155724;
 }
 
 .validation-checks li.failed .check-icon {
-    color: var(--error-color);
+    background-color: #f8d7da;
+    color: #721c24;
 }
 
 .check-name {

@@ -414,15 +414,15 @@ class VNetPalette {
         if (result.valid) {
             let message = 'La V-Net es válida.';
             if (result.warnings && result.warnings.length > 0) {
-                message += '\n\n⚠️ Advertencias:\n• ' + result.warnings.join('\n• ');
+                message += '\n\nAdvertencias:\n• ' + result.warnings.join('\n• ');
                 window.VNetDialogs.showAlert('Validación Exitosa (con advertencias)', message, 'info');
             } else {
                 window.VNetDialogs.showAlert('Validación Exitosa', message, 'success');
             }
         } else {
-            let message = '❌ Errores:\n• ' + result.errors.join('\n• ');
+            let message = 'Errores:\n• ' + result.errors.join('\n• ');
             if (result.warnings && result.warnings.length > 0) {
-                message += '\n\n⚠️ Advertencias:\n• ' + result.warnings.join('\n• ');
+                message += '\n\nAdvertencias:\n• ' + result.warnings.join('\n• ');
             }
             window.VNetDialogs.showAlert('Errores de Validación', message, 'error');
         }

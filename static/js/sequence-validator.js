@@ -356,7 +356,7 @@ const SequenceValidatorDialog = {
         if (sequence.length === 0) {
             document.getElementById('validationResults').innerHTML = `
                 <div class="validation-result error">
-                    <h4>❌ Error de Formato</h4>
+                    <h4>Error de Formato</h4>
                     <p>No se pudo interpretar la secuencia. Verifique el formato.</p>
                 </div>
             `;
@@ -379,7 +379,7 @@ const SequenceValidatorDialog = {
             <div class="validation-result ${result.valid ? 'success' : 'error'}">
                 <div class="validation-header">
                     <div class="validation-status">
-                        ${result.valid ? '✓ Secuencia VÁLIDA' : '✗ Secuencia INVÁLIDA'}
+                        ${result.valid ? 'Secuencia VÁLIDA' : 'Secuencia INVÁLIDA'}
                     </div>
                     <div class="conformity-meter ${conformityClass}">
                         <div class="conformity-fill" style="width: ${result.conformity}%"></div>
@@ -399,7 +399,7 @@ const SequenceValidatorDialog = {
                     <ul>
                         ${result.checks.map(check => `
                             <li class="${check.passed ? 'passed' : 'failed'}">
-                                <span class="check-icon">${check.passed ? '✓' : '✗'}</span>
+                                <span class="check-icon">${check.passed ? 'OK' : 'ERROR'}</span>
                                 <span class="check-name">${check.name}</span>
                                 ${check.detail ? `<span class="check-detail">${check.detail}</span>` : ''}
                             </li>
@@ -411,7 +411,7 @@ const SequenceValidatorDialog = {
         if (result.errors.length > 0) {
             html += `
                 <div class="validation-errors">
-                    <h5>❌ Errores encontrados:</h5>
+                    <h5>Errores encontrados:</h5>
                     <ul>
                         ${result.errors.map(e => `<li>${e}</li>`).join('')}
                     </ul>
@@ -422,7 +422,7 @@ const SequenceValidatorDialog = {
         if (result.warnings.length > 0) {
             html += `
                 <div class="validation-warnings">
-                    <h5>⚠️ Advertencias:</h5>
+                    <h5>Advertencias:</h5>
                     <ul>
                         ${result.warnings.map(w => `<li>${w}</li>`).join('')}
                     </ul>

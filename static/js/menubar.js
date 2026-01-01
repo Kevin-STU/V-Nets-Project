@@ -23,34 +23,34 @@ class VNetMenuBar {
                     <span class="menu-title">Archivo</span>
                     <div class="menu-dropdown" id="menu-file">
                         <div class="menu-option" data-action="new">
-                            <span class="menu-icon">📄</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span>
                             <span class="menu-label">Nuevo</span>
                             <span class="menu-shortcut">Ctrl+N</span>
                         </div>
                         <div class="menu-option" data-action="open">
-                            <span class="menu-icon">📂</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
                             <span class="menu-label">Abrir...</span>
                             <span class="menu-shortcut">Ctrl+O</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="save">
-                            <span class="menu-icon">💾</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg></span>
                             <span class="menu-label">Guardar</span>
                             <span class="menu-shortcut">Ctrl+S</span>
                         </div>
                         <div class="menu-option" data-action="saveAs">
-                            <span class="menu-icon">📝</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
                             <span class="menu-label">Guardar como...</span>
                             <span class="menu-shortcut">Ctrl+Shift+S</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="exportImage">
-                            <span class="menu-icon">🖼️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 00-2.828 0L6 21"/></svg></span>
                             <span class="menu-label">Exportar imagen...</span>
                             <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-option" data-action="exportJson">
-                            <span class="menu-icon">📋</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
                             <span class="menu-label">Exportar JSON</span>
                             <span class="menu-shortcut"></span>
                         </div>
@@ -61,24 +61,24 @@ class VNetMenuBar {
                     <span class="menu-title">Edición</span>
                     <div class="menu-dropdown" id="menu-edit">
                         <div class="menu-option" data-action="undo" id="menuUndo">
-                            <span class="menu-icon">↩️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg></span>
                             <span class="menu-label">Deshacer</span>
                             <span class="menu-shortcut">Ctrl+Z</span>
                         </div>
                         <div class="menu-option" data-action="redo" id="menuRedo">
-                            <span class="menu-icon">↪️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg></span>
                             <span class="menu-label">Rehacer</span>
                             <span class="menu-shortcut">Ctrl+Y</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="delete">
-                            <span class="menu-icon">🗑️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
                             <span class="menu-label">Eliminar selección</span>
                             <span class="menu-shortcut">Delete</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="clear">
-                            <span class="menu-icon">🧹</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l.707.707A1 1 0 0012.414 11H15m2 0h1.586a1 1 0 01.707.293l.707.707A1 1 0 0021 12.414V15m0 2h-1.586a1 1 0 01-.707-.293l-.707-.707A1 1 0 0117.586 16H15m-2 0H9"/><path d="M4.018 4.018a11.963 11.963 0 010 16.964 11.963 11.963 0 0116.964 0"/></svg></span>
                             <span class="menu-label">Limpiar canvas</span>
                             <span class="menu-shortcut"></span>
                         </div>
@@ -89,18 +89,18 @@ class VNetMenuBar {
                     <span class="menu-title">Validación</span>
                     <div class="menu-dropdown" id="menu-validation">
                         <div class="menu-option" data-action="validate">
-                            <span class="menu-icon">✅</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg></span>
                             <span class="menu-label">Validar V-Net</span>
                             <span class="menu-shortcut">F5</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="generateSeq">
-                            <span class="menu-icon">🔄</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M20.49 9A9 9 0 105.64 5.64L23 10M14 10l-4.5 4.5"/></svg></span>
                             <span class="menu-label">Generar secuencias...</span>
                             <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-option" data-action="validateSeq">
-                            <span class="menu-icon">📋</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
                             <span class="menu-label">Validar secuencia manual...</span>
                             <span class="menu-shortcut"></span>
                         </div>
@@ -111,23 +111,23 @@ class VNetMenuBar {
                     <span class="menu-title">Vista</span>
                     <div class="menu-dropdown" id="menu-view">
                         <div class="menu-option" data-action="zoomIn">
-                            <span class="menu-icon">🔍</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
                             <span class="menu-label">Acercar</span>
                             <span class="menu-shortcut">+</span>
                         </div>
                         <div class="menu-option" data-action="zoomOut">
-                            <span class="menu-icon">🔍</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
                             <span class="menu-label">Alejar</span>
                             <span class="menu-shortcut">-</span>
                         </div>
                         <div class="menu-option" data-action="resetZoom">
-                            <span class="menu-icon">🔄</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></span>
                             <span class="menu-label">Restablecer zoom</span>
                             <span class="menu-shortcut">Ctrl+0</span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="fitWindow">
-                            <span class="menu-icon">📐</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 9l6 6M15 9l-6 6"/></svg></span>
                             <span class="menu-label">Ajustar a ventana</span>
                             <span class="menu-shortcut"></span>
                         </div>
@@ -138,13 +138,13 @@ class VNetMenuBar {
                     <span class="menu-title">Ayuda</span>
                     <div class="menu-dropdown" id="menu-help">
                         <div class="menu-option" data-action="shortcuts">
-                            <span class="menu-icon">⌨️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
                             <span class="menu-label">Atajos de teclado</span>
                             <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="about">
-                            <span class="menu-icon">ℹ️</span>
+                            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                             <span class="menu-label">Acerca de...</span>
                             <span class="menu-shortcut"></span>
                         </div>

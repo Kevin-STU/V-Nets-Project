@@ -574,7 +574,7 @@ const SequenceGeneratorDialog = {
                     <span class="stat-label">Longitud promedio</span>
                 </div>
             </div>
-            ${limitReached ? '<p class="warning-text">⚠️ Se alcanzó el límite de secuencias configurado.</p>' : ''}
+            ${limitReached ? '<p class="warning-text">Advertencia: Se alcanzó el límite de secuencias configurado.</p>' : ''}
         `;
 
         if (sequences.length === 0) {
