@@ -338,6 +338,15 @@ class VNetGraph {
     }
 
     addConnection(connection, saveUndo = true) {
+        console.log(`addConnection llamado: ${connection.source.name} → ${connection.target.name}`);
+
+        // Validar restricciones semánticas de V-Net
+        // Un evento END no puede tener conexiones salientes
+        if (connection.source.eventType === 'end') {
+            console.warn('Un evento END no puede tener conexiones salientes');
+            return null;
+        }
+
         // Check if connection already exists
         const existing = Object.values(this.connections).find(
             c => c.source.id === connection.source.id && c.target.id === connection.target.id
@@ -346,6 +355,8 @@ class VNetGraph {
             console.warn('Connection already exists');
             return null;
         }
+
+        console.log('Conexión válida, agregando al modelo');
 
         if (saveUndo) this.saveUndoState('Agregar conexión');
 

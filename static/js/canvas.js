@@ -541,16 +541,37 @@ class VNetCanvas {
         const sourceEvent = this.connectionSource.eventData;
         const targetEvent = targetGroup.eventData;
 
+        console.log(`Intentando conectar: ${sourceEvent.name} (${sourceEvent.eventType}) → ${targetEvent.name} (${targetEvent.eventType})`);
+
+        // Validar restricciones de V-Net
+        let errorMsg = null;
+
+        if (sourceEvent.eventType === 'end') {
+            errorMsg = 'Un evento END no puede tener conexiones salientes.';
+        }
+
+        if (errorMsg) {
+            console.log('Error de validación:', errorMsg);
+            window.VNetDialogs.showAlert('Conexión no válida', errorMsg, 'error');
+            this.cancelConnection();
+            return;
+        }
+
         // Create connection in model
         const connection = new window.VNetModels.Connection(sourceEvent, targetEvent);
         const added = this.vnet.addConnection(connection);
 
         if (added) {
+            console.log('Conexión creada exitosamente');
             // Create graphic
             const connectionGraphic = this.createConnectionGraphic(connection);
             connection.graphicItem = connectionGraphic;
             this.connectionsLayer.add(connectionGraphic);
             this.connectionsLayer.batchDraw();
+        } else {
+            console.log('Falló al crear la conexión en el modelo');
+            // Mostrar error genérico si la conexión no se pudo agregar
+            window.VNetDialogs.showAlert('Error', 'No se pudo crear la conexión. Verifica que no exista ya.', 'error');
         }
 
         this.cancelConnection();
