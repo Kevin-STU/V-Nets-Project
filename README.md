@@ -98,7 +98,7 @@ Acceder en: http://localhost:8000
 
 ### Opción 4: Con Backend Flask
 
-**Requisitos**: Python 3.x
+**Requisitos**: Python 3.x, Flask, pandas, networkx
 
 1. Instalar dependencias:
    ```bash
@@ -111,6 +111,8 @@ Acceder en: http://localhost:8000
    ```
 
 3. Acceder en: http://localhost:5000
+
+**Nota**: Esta opción ejecuta los algoritmos VNDA en el servidor Python en lugar del navegador. Proporciona las mismas funcionalidades que la versión web pero requiere instalación de dependencias Python.
 
 ## Uso del Editor Visual
 
