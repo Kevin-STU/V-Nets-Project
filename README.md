@@ -35,6 +35,27 @@ Implementa tres algoritmos principales:
 - Validación de secuencias con múltiples formatos de entrada
 - Métrica de porcentaje de conformidad
 
+### Implementaciones Matemáticas del Artículo
+
+#### Tiempo de Evaluación (tleval)
+- Implementado cálculo automático del tiempo máximo de evaluación
+- Se calcula como el camino más largo desde cualquier INIT hasta cualquier END
+- Actualización automática cuando cambian las restricciones temporales
+
+#### Algoritmo 2: Matching Event Sequences Algorithm
+- Validación precisa de restricciones temporales entre eventos consecutivos
+- Implementa la función `MatchWithVnet(sequence)` del artículo
+- Verifica que `ti+1 - ti` esté dentro del intervalo `[minTime, maxTime]`
+- Mejora la precisión de validación de secuencias
+
+#### Matrices de Ocurrencia
+- Implementación completa del sistema matricial del artículo
+- Matrices con filas: INIT, Oc1, Oc2, ..., END
+- Columnas para cada tipo de evento del conjunto E
+- Generación automática para secuencias representativas
+- Validación de integridad matricial
+- Conversión a formato textual legible
+
 ### Validación de Secuencias Manuales
 - Soporte para múltiples formatos: con tiempos, sin tiempos, formato tabla
 - Verificación automática de eventos, conexiones y restricciones temporales
@@ -212,6 +233,12 @@ vnets_editor/V-Nets-algorithm/
 **Estilos**:
 - CSS moderno con variables CSS
 - Diseño responsive
+
+**Implementaciones Matemáticas**:
+- Basado en el artículo: "The power of V-nets for managing complex event sequences"
+- tleval: Tiempo máximo de evaluación de secuencias
+- Algoritmo 2: Matching Event Sequences Algorithm para validación temporal
+- Matrices de ocurrencia: Representación matricial de secuencias según definición del artículo
 
 ## Notas de Desarrollo
 

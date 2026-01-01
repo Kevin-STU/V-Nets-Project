@@ -145,13 +145,16 @@ const SequenceValidator = {
             results.checks.push({ name: 'Fin con END', passed: true, detail: `Termina con '${sequence[sequence.length - 1].name}'` });
         }
 
-        // 5. Verificar conexiones entre eventos consecutivos
+        // 5. Verificar conexiones entre eventos consecutivos (Algoritmo 2 del artículo)
         const connectionErrors = [];
+        const temporalErrors = [];
+
         for (let i = 0; i < sequence.length - 1; i++) {
             const fromName = sequence[i].name;
             const toName = sequence[i + 1].name;
-            
-            const conn = connections.find(c => 
+            const timeDiff = sequence[i + 1].time - sequence[i].time;
+
+            const conn = connections.find(c =>
                 c.source.name === fromName && c.target.name === toName
             );
 
@@ -159,22 +162,52 @@ const SequenceValidator = {
             if (!conn) {
                 connectionErrors.push(`${fromName} → ${toName}`);
             } else {
-                passedChecks++;
+                // Algoritmo 2: Verificar restricciones temporales (MatchWithVnet del artículo)
+                const Texpected = this.getTimeConstraint(conn);
+                const isWithinConstraint = this.checkTimeConstraint(timeDiff, Texpected);
+
+                if (!isWithinConstraint) {
+                    const maxTimeStr = Texpected.maxTime === Infinity ? '∞' : Texpected.maxTime.toFixed(2);
+                    temporalErrors.push(
+                        `${fromName} → ${toName}: tiempo=${timeDiff.toFixed(2)}, esperado=[${Texpected.minTime.toFixed(2)}, ${maxTimeStr}]`
+                    );
+                } else {
+                    passedChecks++;
+                }
             }
         }
 
+        // Reportar errores de conexiones
         if (connectionErrors.length > 0) {
             results.errors.push(`Conexiones no válidas: ${connectionErrors.join(', ')}`);
-            results.checks.push({ 
-                name: 'Conexiones válidas', 
-                passed: false, 
-                detail: `${connectionErrors.length} conexiones inválidas` 
+            results.checks.push({
+                name: 'Conexiones válidas',
+                passed: false,
+                detail: `${connectionErrors.length} conexiones inválidas`
             });
-        } else if (sequence.length > 1) {
-            results.checks.push({ 
-                name: 'Conexiones válidas', 
-                passed: true, 
-                detail: `${sequence.length - 1} conexiones verificadas` 
+        }
+
+        // Reportar errores temporales (Algoritmo 2)
+        if (temporalErrors.length > 0) {
+            results.errors.push(`Restricciones temporales violadas: ${temporalErrors.join('; ')}`);
+            results.checks.push({
+                name: 'Restricciones temporales (Algoritmo 2)',
+                passed: false,
+                detail: `${temporalErrors.length} violaciones temporales`
+            });
+        }
+
+        // Éxito si no hay errores de conexiones ni temporales
+        if (connectionErrors.length === 0 && temporalErrors.length === 0 && sequence.length > 1) {
+            results.checks.push({
+                name: 'Conexiones válidas',
+                passed: true,
+                detail: `${sequence.length - 1} conexiones verificadas`
+            });
+            results.checks.push({
+                name: 'Restricciones temporales (Algoritmo 2)',
+                passed: true,
+                detail: `${sequence.length - 1} restricciones temporales válidas`
             });
         }
 
@@ -456,6 +489,21 @@ const SequenceValidatorDialog = {
         `;
 
         document.getElementById('validationResults').innerHTML = html;
+    },
+
+    // Algoritmo 2 del artículo: Obtener restricción temporal entre eventos
+    getTimeConstraint(connection) {
+        return {
+            minTime: connection.minTime,
+            maxTime: connection.maxTime
+        };
+    },
+
+    // Algoritmo 2 del artículo: Verificar si el tiempo está dentro de la restricción
+    checkTimeConstraint(actualTimeDiff, expectedConstraint) {
+        // Según el artículo: if (ti+1 - ti) is not within Texpected then return False
+        const { minTime, maxTime } = expectedConstraint;
+        return actualTimeDiff >= minTime && (maxTime === Infinity || actualTimeDiff <= maxTime);
     }
 };
 

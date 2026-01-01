@@ -235,21 +235,90 @@ class VNetGraph {
         this.changed = false;
         this.onValidationError = null;
         this.onGraphChanged = null;
-        
+
         // Sistema de Undo/Redo
         this.undoManager = new UndoManager();
         this._isRestoringState = false;
+
+        // tleval: tiempo máximo de evaluación de secuencias (del artículo)
+        this.tleval = 0;
     }
 
     // Guardar estado actual para undo
     saveUndoState(description = '') {
         if (this._isRestoringState) return;
-        
+
         const state = {
             events: Object.values(this.events).map(e => e.toDict()),
             connections: Object.values(this.connections).map(c => c.toDict())
         };
         this.undoManager.saveState(state, description);
+
+        // Actualizar tleval cuando cambia el estado
+        this.updateTleval();
+    }
+
+    // Calcular tleval: tiempo máximo de evaluación (del artículo)
+    updateTleval() {
+        // tleval es el tiempo máximo de evaluación de una secuencia
+        // Se calcula como el máximo tiempo posible en una secuencia completa INIT->END
+
+        const initEvents = Object.values(this.events).filter(e => e.eventType === 'init');
+        const endEvents = Object.values(this.events).filter(e => e.eventType === 'end');
+
+        if (initEvents.length === 0 || endEvents.length === 0) {
+            this.tleval = 0;
+            return;
+        }
+
+        let maxTime = 0;
+
+        // Para cada par INIT->END, calcular el tiempo máximo posible
+        for (const init of initEvents) {
+            for (const end of endEvents) {
+                const pathTime = this.calculateMaxPathTime(init, end);
+                maxTime = Math.max(maxTime, pathTime);
+            }
+        }
+
+        this.tleval = maxTime;
+    }
+
+    // Calcular tiempo máximo en el camino más largo entre dos eventos
+    calculateMaxPathTime(startEvent, endEvent) {
+        // Algoritmo simplificado: suma las restricciones temporales máximas
+        // en el camino más largo desde start hasta end
+
+        const visited = new Set();
+        const maxTime = this._dfsMaxTime(startEvent, endEvent, visited);
+        return maxTime;
+    }
+
+    _dfsMaxTime(current, target, visited) {
+        if (current.id === target.id) {
+            return 0; // Llegamos al destino
+        }
+
+        if (visited.has(current.id)) {
+            return 0; // Evitar ciclos
+        }
+
+        visited.add(current.id);
+        let maxPathTime = 0;
+
+        // Explorar todas las conexiones salientes
+        for (const conn of current.outgoing) {
+            const nextEvent = conn.target;
+            const edgeTime = conn.maxTime === Infinity ? 1000 : conn.maxTime; // Usar 1000 como límite superior razonable
+            const remainingTime = this._dfsMaxTime(nextEvent, target, visited);
+
+            if (remainingTime >= 0) { // Si hay camino válido
+                maxPathTime = Math.max(maxPathTime, edgeTime + remainingTime);
+            }
+        }
+
+        visited.delete(current.id);
+        return maxPathTime;
     }
 
     // Deshacer última acción
