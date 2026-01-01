@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V-net Automatic Generation Tool</title>
+    <title>V-net Tool - Editor y Generador Automático</title>
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.19.0/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <!-- Editor Styles -->
+    <link rel="stylesheet" href="static/css/editor.css">
     <style>
         * {
             margin: 0;
@@ -37,7 +42,7 @@
             font-weight: 700;
             color: #2c3e50;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .header p {
@@ -45,6 +50,58 @@
             color: #7f8c8d;
             max-width: 600px;
             margin: 0 auto;
+        }
+
+        /* Main Tab Navigation */
+        .main-tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 6px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-tab-btn {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .main-tab-btn:hover {
+            color: #2c3e50;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .main-tab-btn.active {
+            background: white;
+            color: #3498db;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-tab-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
         }
 
         .main-grid {
@@ -58,8 +115,8 @@
             background: white;
             border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(10px);
         }
 
@@ -92,7 +149,8 @@
             font-size: 0.95rem;
         }
 
-        textarea, input[type="file"] {
+        textarea,
+        input[type="file"] {
             width: 100%;
             padding: 12px 16px;
             border: 2px solid #e1e8ed;
@@ -103,7 +161,8 @@
             background: #fafbfc;
         }
 
-        textarea:focus, input[type="file"]:focus {
+        textarea:focus,
+        input[type="file"]:focus {
             outline: none;
             border-color: #3498db;
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
@@ -165,7 +224,7 @@
             border: 2px solid #e1e8ed;
             border-radius: 12px;
             background: white;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         #text-output {
@@ -284,7 +343,7 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
+            border: 3px solid rgba(255, 255, 255, .3);
             border-radius: 50%;
             border-top-color: #fff;
             animation: spin 1s ease-in-out infinite;
@@ -292,7 +351,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Scrollbar styling */
@@ -319,93 +380,148 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>V-net Automatic Generation Tool</h1>
-            <p>Generate and visualize V-net models from event sequences with timing constraints and warning predicates</p>
+            <h1>V-net Tool</h1>
+            <p>Editor Visual y Generador Automático de modelos V-net</p>
         </div>
 
-        <div class="main-grid">
-            <div class="card">
-                <h2>Input Event Sequences</h2>
-                
-                <h3>Manual Input</h3>
-                <div class="input-group">
-                    <textarea id="manual-input" placeholder="Format: SequenceID,EventType,Timestamp&#10;Sequence1,e1,1.049432&#10;Sequence1,e2,1.606904"></textarea>
-                </div>
-
-                <h3>Timing Constraints (optional)</h3>
-                <div class="input-group">
-                    <textarea id="manual-input-2" placeholder="Format: Event1ID,Event2ID,MinTime,MaxTime&#10;e1,e2,1.0,2.0"></textarea>
-                </div>
-
-                <h3>Warning Predicates (optional)</h3>
-                <div class="input-group">
-                    <textarea id="manual-input-3" placeholder="Examples:&#10;Frec(a)=2&#10;b->c before d&#10;Frec(a)>=1 ∧ Frec(b)=0"></textarea>
-                </div>
-
-                <button onclick="submitManualInput()">Submit Manual Input</button>
-            </div>
-
-            <div class="card">
-                <h2>File Upload</h2>
-                
-                <div class="input-group">
-                    <label>Event Sequences File</label>
-                    <input type="file" id="file-input" accept=".csv,.txt">
-                </div>
-
-                <div class="input-group">
-                    <label>Timing Constraints File (optional)</label>
-                    <input type="file" id="constraints-file" accept=".csv">
-                </div>
-
-                <div class="input-group">
-                    <label>Warning Predicates File (optional)</label>
-                    <input type="file" id="predicates-file" accept=".csv">
-                </div>
-
-                <button onclick="submitFileInput()">Upload Files</button>
-
-                <div id="error-message" class="error" style="display: none;"></div>
-            </div>
+        <!-- Tab Navigation -->
+        <div class="main-tabs">
+            <button class="main-tab-btn active" onclick="switchTab('editor')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 3v18M3 9h18" />
+                </svg>
+                Editor Visual
+            </button>
+            <button class="main-tab-btn" onclick="switchTab('generator')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                Generador Automático
+            </button>
         </div>
 
-        <div class="card output-section">
-            <h2>V-net Output</h2>
+        <!-- Editor Tab Panel -->
+        <div id="editor-panel" class="tab-panel active">
+            <!-- Barra de menús -->
+            <div id="vnet-menubar" class="menubar-container"></div>
             
-            <div class="output-grid">
-                <div>
-                    <h3>Textual Representation</h3>
-                    <pre id="text-output"></pre>
+            <div class="editor-container">
+                <div id="vnet-palette" class="editor-palette">
+                    <!-- Palette content will be generated by JavaScript -->
+                </div>
+                <div id="vnet-canvas" class="editor-canvas">
+                    <!-- Canvas will be generated by Konva.js -->
+                </div>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <h3>Instrucciones</h3>
+                <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
+                    <li><strong>Crear eventos:</strong> Arrastra los componentes desde la paleta izquierda al canvas.
+                    </li>
+                    <li><strong>Conectar eventos:</strong> Selecciona "Conectar" y haz clic en el evento origen, luego
+                        en el destino.</li>
+                    <li><strong>Editar propiedades:</strong> Doble clic en un evento o conexión.</li>
+                    <li><strong>Eliminar:</strong> Selecciona y presiona Delete o usa el menú contextual (clic derecho).
+                    </li>
+                    <li><strong>Atajos:</strong> V = Seleccionar, C = Conectar, Esc = Cancelar</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Generator Tab Panel -->
+        <div id="generator-panel" class="tab-panel">
+
+            <div class="main-grid">
+                <div class="card">
+                    <h2>Input Event Sequences</h2>
+
+                    <h3>Manual Input</h3>
+                    <div class="input-group">
+                        <textarea id="manual-input"
+                            placeholder="Format: SequenceID,EventType,Timestamp&#10;Sequence1,e1,1.049432&#10;Sequence1,e2,1.606904"></textarea>
+                    </div>
+
+                    <h3>Timing Constraints (optional)</h3>
+                    <div class="input-group">
+                        <textarea id="manual-input-2"
+                            placeholder="Format: Event1ID,Event2ID,MinTime,MaxTime&#10;e1,e2,1.0,2.0"></textarea>
+                    </div>
+
+                    <h3>Warning Predicates (optional)</h3>
+                    <div class="input-group">
+                        <textarea id="manual-input-3"
+                            placeholder="Examples:&#10;Frec(a)=2&#10;b->c before d&#10;Frec(a)>=1 ∧ Frec(b)=0"></textarea>
+                    </div>
+
+                    <button onclick="submitManualInput()">Submit Manual Input</button>
                 </div>
 
-                <div>
-                    <h3>Warning Predicates Evaluation</h3>
-                    <div id="warnings-output">
-                        <p class="placeholder-text">No warning predicates provided.</p>
+                <div class="card">
+                    <h2>File Upload</h2>
+
+                    <div class="input-group">
+                        <label>Event Sequences File</label>
+                        <input type="file" id="file-input" accept=".csv,.txt">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Timing Constraints File (optional)</label>
+                        <input type="file" id="constraints-file" accept=".csv">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Warning Predicates File (optional)</label>
+                        <input type="file" id="predicates-file" accept=".csv">
+                    </div>
+
+                    <button onclick="submitFileInput()">Upload Files</button>
+
+                    <div id="error-message" class="error" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card output-section">
+                <h2>V-net Output</h2>
+
+                <div class="output-grid">
+                    <div>
+                        <h3>Textual Representation</h3>
+                        <pre id="text-output"></pre>
+                    </div>
+
+                    <div>
+                        <h3>Warning Predicates Evaluation</h3>
+                        <div id="warnings-output">
+                            <p class="placeholder-text">No warning predicates provided.</p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="graph-container">
-                <h3>Graphical Representation</h3>
-                <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 0.9rem; color: #6c757d;">
-                    <strong>Legend:</strong> 
-                    Each edge shows aggregated timing intervals [min, max] across all sequences. 
-                    Constraint-based edges are shown in orange and dashed.
-                    Triangles = INIT events, Circles = END events, Purple pentagons = Both INIT and END events, Yellow = Events with absence probability > 0
+                <div class="graph-container">
+                    <h3>Graphical Representation</h3>
+                    <div
+                        style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 0.9rem; color: #6c757d;">
+                        <strong>Legend:</strong>
+                        Each edge shows aggregated timing intervals [min, max] across all sequences.
+                        Constraint-based edges are shown in orange and dashed.
+                        Triangles = INIT events, Circles = END events, Purple pentagons = Both INIT and END events,
+                        Yellow =
+                        Events with absence probability > 0
+                    </div>
+                    <div id="cy"></div>
                 </div>
-                <div id="cy"></div>
             </div>
         </div>
-    </div>
 
+    </div> <!-- End generator-panel -->
     <script>
         // CSV parsing utility
         function parseCSV(text, delimiter = ',') {
             const lines = text.trim().split('\n');
             const headers = lines[0].split(delimiter).map(h => h.trim());
             const data = [];
-            
+
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(delimiter).map(v => v.trim());
                 const row = {};
@@ -414,18 +530,18 @@
                 });
                 data.push(row);
             }
-            
+
             return data;
         }
 
         // Data validation
         function validateData(data) {
             const requiredCols = ['SequenceID', 'EventType', 'Timestamp'];
-            
+
             if (!data || data.length === 0) {
                 return { valid: false, error: "No data provided" };
             }
-            
+
             // Check required columns
             const cols = Object.keys(data[0]);
             for (const col of requiredCols) {
@@ -433,7 +549,7 @@
                     return { valid: false, error: `Missing required column: ${col}` };
                 }
             }
-            
+
             // Validate timestamps are numeric
             for (const row of data) {
                 const timestamp = parseFloat(row.Timestamp);
@@ -441,14 +557,14 @@
                     return { valid: false, error: "Timestamps must be numeric" };
                 }
             }
-            
+
             // Validate event types are alphanumeric
             for (const row of data) {
                 if (!row.EventType || !/^[a-zA-Z0-9_]+$/.test(row.EventType)) {
                     return { valid: false, error: "Event types must be alphanumeric strings" };
                 }
             }
-            
+
             return { valid: true, error: "" };
         }
 
@@ -539,19 +655,19 @@
         function vnda(sequences, constraints = null) {
             const data = sequences;
             const grouped = groupBySequenceID(data);
-            
+
             // Initialize V-net components
             const E = new Set();
             const INIT = new Set();
             const END = new Set();
             const Frec = {};
-            
+
             // Calculate event sets and frequencies
             data.forEach(row => {
                 E.add(row.EventType);
                 Frec[row.EventType] = (Frec[row.EventType] || 0) + 1;
             });
-            
+
             // Calculate INIT and END sets
             Object.values(grouped).forEach(group => {
                 if (group.length > 0) {
@@ -559,14 +675,14 @@
                     END.add(group[group.length - 1].EventType);
                 }
             });
-            
+
             // Calculate event absence probability
             const totalSequences = Object.keys(grouped).length;
             const eventAbsenceProb = {};
             E.forEach(event => {
                 eventAbsenceProb[event] = Math.round((1 - (Frec[event] || 0) / totalSequences) * 1000) / 1000;
             });
-            
+
             // Calculate aggregated temporal constraints
             let T = aggregateIntervals(grouped);
 
@@ -578,7 +694,7 @@
                     const key = `${row.Event1ID},${row.Event2ID}`;
                     constraintDict[key] = [parseFloat(row.MinTime), parseFloat(row.MaxTime)];
                 });
-                
+
                 const updatedT = [];
                 T.forEach(([ei, ej, interval]) => {
                     const key = `${ei},${ej}`;
@@ -590,7 +706,7 @@
                     }
                 });
                 T = updatedT;
-                
+
                 // Add any additional constraints not found in calculated intervals
                 const existingPairs = new Set(T.map(([ei, ej]) => `${ei},${ej}`));
                 Object.entries(constraintDict).forEach(([key, interval]) => {
@@ -601,7 +717,7 @@
                     }
                 });
             }
-            
+
             // Calculate tl_eval (maximum time length across sequences)
             let tlEval = 0;
             Object.values(grouped).forEach(group => {
@@ -612,19 +728,19 @@
                 }
             });
             tlEval = Math.round(tlEval * 1000000) / 1000000;
-            
+
             // Construct occurrence matrices
             const matrices = [];
             Object.values(grouped).forEach(group => {
                 const eventsList = group.map(row => row.EventType);
                 const matrix = {};
-                
+
                 // INIT row
                 matrix['INIT'] = {};
                 E.forEach(event => {
                     matrix['INIT'][event] = eventsList[0] === event ? 1 : 0;
                 });
-                
+
                 // Occurrence rows (middle events only)
                 for (let i = 1; i < eventsList.length - 1; i++) {
                     const event = eventsList[i];
@@ -634,22 +750,22 @@
                         matrix[ocLabel][e] = e === event ? 1 : 0;
                     });
                 }
-                
+
                 // END row
                 matrix['END'] = {};
                 E.forEach(event => {
                     matrix['END'][event] = eventsList[eventsList.length - 1] === event ? 1 : 0;
                 });
-                
+
                 matrices.push(matrix);
             });
-            
+
             // Define logical predicates
             const R = [
                 `INIT(${Array.from(INIT).join(',')})`,
                 `END(${Array.from(END).join(',')})`
             ];
-            
+
             // Create graph structure
             const graph = {
                 nodes: Array.from(E).map(event => ({
@@ -666,7 +782,7 @@
                 }))
 
             };
-            
+
             return {
                 E: Array.from(E),
                 T: T,
@@ -685,7 +801,7 @@
         function formatTextualOutput(vnet) {
             const lines = ["V-net Definition:"];
             lines.push(`E = {${vnet.E.join(', ')}}`);
-            lines.push("T = {" + vnet.T.map(({ from, fromOcc, to, toOcc, interval }) => 
+            lines.push("T = {" + vnet.T.map(({ from, fromOcc, to, toOcc, interval }) =>
                 `${from}^${fromOcc}[${interval[0]},${interval[1]}]^${toOcc}${to}`).join(', ') + "}");
             lines.push(`Frec = {${Object.entries(vnet.Frec).map(([k, v]) => `${k}: ${v}`).join(', ')}}`);
             lines.push("AbsenceProb = {" + Object.entries(vnet.AbsenceProb).map(([k, v]) => `${k}: ${v}`).join(', ') + "}");
@@ -693,17 +809,17 @@
             lines.push(`INIT = {${vnet.INIT.join(', ')}}`);
             lines.push(`END = {${vnet.END.join(', ')}}`);
             lines.push(`tl_eval = ${vnet.tl_eval}`);
-            
+
             vnet.matrices.forEach((matrix, i) => {
                 lines.push(`\nMATRIX ${i + 1}`);
-                
+
                 const sortedEvents = vnet.E.slice().sort();
                 lines.push("\t" + [' '].concat(sortedEvents).join("\t"));
-                
+
                 const occurrenceKeys = Object.keys(matrix).filter(k => k.startsWith('Oc'))
                     .sort((a, b) => parseInt(a.substring(2)) - parseInt(b.substring(2)));
                 const orderedKeys = ['INIT'].concat(occurrenceKeys).concat(['END']);
-                
+
                 orderedKeys.forEach(rowKey => {
                     if (matrix[rowKey]) {
                         const rowValues = sortedEvents.map(event => matrix[rowKey][event] || 0);
@@ -711,14 +827,14 @@
                     }
                 });
             });
-            
+
             return lines.join("\n");
         }
 
         // Convert graph to Cytoscape format
         function convertGraphToCytoscape(vnet) {
             const elements = [];
-            
+
             // Add nodes
             vnet.graph.nodes.forEach(node => {
                 const highlightYellow = node.absence_prob > 0;
@@ -732,7 +848,7 @@
                     }
                 });
             });
-            
+
             // Add edges
             vnet.graph.edges.forEach(edge => {
                 elements.push({
@@ -744,7 +860,7 @@
                     }
                 });
             });
-            
+
             return elements;
         }
 
@@ -753,7 +869,7 @@
             if (!predicatesText || !predicatesText.trim()) {
                 return [];
             }
-            
+
             return predicatesText.trim().split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0);
@@ -763,15 +879,15 @@
         function evaluateFrequencyPredicate(predicate, vnet) {
             const pattern = /Frec\(([a-zA-Z0-9_]+)\)\s*(>=|<=|>|<|=|!=)\s*(\d+)/;
             const match = predicate.match(pattern);
-            
+
             if (!match) {
                 return { result: false, detail: `Invalid frequency predicate format: ${predicate}` };
             }
-            
+
             const [, event, operator, value] = match;
             const numValue = parseInt(value);
             const actualFreq = vnet.Frec[event] || 0;
-            
+
             let result;
             switch (operator) {
                 case '=': result = actualFreq === numValue; break;
@@ -782,7 +898,7 @@
                 case '!=': result = actualFreq !== numValue; break;
                 default: return { result: false, detail: `Unsupported operator: ${operator}` };
             }
-            
+
             return { result, detail: `Frec(${event}) = ${actualFreq} ${operator} ${numValue}` };
         }
 
@@ -790,26 +906,26 @@
         function evaluateTemporalPredicate(predicate, vnet) {
             const pattern = /([a-zA-Z0-9_]+)->([a-zA-Z0-9_]+)\s+before\s+([a-zA-Z0-9_]+)/;
             const match = predicate.match(pattern);
-            
+
             if (!match) {
                 return { result: false, detail: `Invalid temporal predicate format: ${predicate}` };
             }
-            
+
             const [, event1, event2, event3] = match;
-            
+
             // Check if the edge event1->event2 exists and event3 exists
-            const hasEdge = vnet.graph.edges.some(edge => 
+            const hasEdge = vnet.graph.edges.some(edge =>
                 edge.source === event1 && edge.target === event2);
             const hasEvent3 = vnet.E.includes(event3);
-            
+
             if (!hasEdge) {
                 return { result: false, detail: `Edge ${event1}->${event2} not found in V-net` };
             }
-            
+
             if (!hasEvent3) {
                 return { result: false, detail: `Event ${event3} not found in V-net` };
             }
-            
+
             return { result: true, detail: `Transition ${event1}->${event2} exists and ${event3} is present` };
         }
 
@@ -820,7 +936,7 @@
                 const parts = predicate.split('∧').map(p => p.trim());
                 const results = [];
                 const details = [];
-                
+
                 for (const part of parts) {
                     let evalResult;
                     if (part.startsWith('Frec(')) {
@@ -830,15 +946,15 @@
                     } else {
                         evalResult = { result: false, detail: `Unknown predicate type: ${part}` };
                     }
-                    
+
                     results.push(evalResult.result);
                     details.push(evalResult.detail);
                 }
-                
+
                 const finalResult = results.every(r => r);
                 return { result: finalResult, detail: details.join(' AND ') };
             }
-            
+
             // Single predicate
             if (predicate.startsWith('Frec(')) {
                 return evaluateFrequencyPredicate(predicate, vnet);
@@ -852,7 +968,7 @@
         // Check warning predicates
         function checkWarningPredicates(predicates, vnet) {
             const warnings = [];
-            
+
             predicates.forEach(predicate => {
                 try {
                     const evaluation = evaluateLogicalPredicate(predicate, vnet);
@@ -860,7 +976,7 @@
                         predicate: predicate,
                         matched: evaluation.result,
                         detail: evaluation.detail,
-                        message: evaluation.result ? 
+                        message: evaluation.result ?
                             `WARNING: Condition matched - ${evaluation.detail}` :
                             `OK: Condition not matched - ${evaluation.detail}`
                     });
@@ -873,7 +989,7 @@
                     });
                 }
             });
-            
+
             return warnings;
         }
 
@@ -884,16 +1000,16 @@
                 if (!validation.valid) {
                     throw new Error(validation.error);
                 }
-                
+
                 const vnet = vnda(sequences, constraints);
                 const textualOutput = formatTextualOutput(vnet);
                 const graphOutput = convertGraphToCytoscape(vnet);
-                
+
                 let warnings = [];
                 if (predicates && predicates.length > 0) {
                     warnings = checkWarningPredicates(predicates, vnet);
                 }
-                
+
                 return {
                     textual: textualOutput,
                     graph: graphOutput,
@@ -910,16 +1026,16 @@
                 const input = document.getElementById('manual-input').value;
                 const constraintsInput = document.getElementById('manual-input-2').value;
                 const predicatesInput = document.getElementById('manual-input-3').value;
-                
+
                 if (!input.trim()) {
                     displayError('Please provide event sequence data.');
                     return;
                 }
-                
+
                 const sequences = parseCSV(input);
                 const constraints = constraintsInput.trim() ? parseCSV(constraintsInput) : null;
                 const predicates = predicatesInput.trim() ? parseWarningPredicates(predicatesInput) : null;
-                
+
                 const result = processData(sequences, constraints, predicates);
                 displayOutput(result);
             } catch (error) {
@@ -931,14 +1047,14 @@
             const fileInput = document.getElementById('file-input');
             const constraintsFile = document.getElementById('constraints-file');
             const predicatesFile = document.getElementById('predicates-file');
-            
+
             if (!fileInput.files[0]) {
                 displayError('Please select a file.');
                 return;
             }
-            
+
             const readers = [];
-            
+
             // Read main file
             readers.push(new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -946,7 +1062,7 @@
                 reader.onerror = reject;
                 reader.readAsText(fileInput.files[0]);
             }));
-            
+
             // Read constraints file if provided
             if (constraintsFile.files[0]) {
                 readers.push(new Promise((resolve, reject) => {
@@ -956,7 +1072,7 @@
                     reader.readAsText(constraintsFile.files[0]);
                 }));
             }
-            
+
             // Read predicates file if provided
             if (predicatesFile.files[0]) {
                 readers.push(new Promise((resolve, reject) => {
@@ -966,11 +1082,11 @@
                     reader.readAsText(predicatesFile.files[0]);
                 }));
             }
-            
+
             Promise.all(readers).then(results => {
                 try {
                     let sequences, constraints = null, predicates = null;
-                    
+
                     results.forEach(result => {
                         switch (result.type) {
                             case 'main':
@@ -985,7 +1101,7 @@
                                 break;
                         }
                     });
-                    
+
                     const output = processData(sequences, constraints, predicates);
                     displayOutput(output);
                 } catch (error) {
@@ -1000,9 +1116,9 @@
             const errorDiv = document.getElementById('error-message');
             errorDiv.style.display = 'none';
             errorDiv.innerText = '';
-            
+
             document.getElementById('text-output').innerText = data.textual || 'No output generated.';
-            
+
             // Display warnings
             const warningsDiv = document.getElementById('warnings-output');
             if (data.warnings && data.warnings.length > 0) {
@@ -1018,7 +1134,7 @@
             } else {
                 warningsDiv.innerHTML = '<p class="placeholder-text">No warning predicates provided.</p>';
             }
-            
+
             if (data.graph) {
                 renderGraph(data.graph);
             }
@@ -1028,7 +1144,7 @@
             const errorDiv = document.getElementById('error-message');
             errorDiv.style.display = 'block';
             errorDiv.innerText = message;
-            
+
             document.getElementById('text-output').innerText = '';
             document.getElementById('warnings-output').innerHTML = '<p class="placeholder-text">No warning predicates provided.</p>';
             document.getElementById('cy').innerHTML = '';
@@ -1110,5 +1226,51 @@
             cy.panningEnabled(true);
         }
     </script>
+
+    <!-- Tab Switching Function -->
+    <script>
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.main-tab-btn').classList.add('active');
+
+            // Update tab panels
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.getElementById(tabName + '-panel').classList.add('active');
+
+            // Resize canvas when switching to editor
+            if (tabName === 'editor' && window.vnetEditor && window.vnetEditor.canvas) {
+                setTimeout(() => window.vnetEditor.canvas.handleResize(), 100);
+            }
+        }
+    </script>
+
+    <!-- V-Nets Editor Scripts -->
+    <script src="static/js/models.js"></script>
+    <script src="static/js/dialogs.js"></script>
+    <script src="static/js/canvas.js"></script>
+    <script src="static/js/palette.js"></script>
+    <script src="static/js/sequence-generator.js"></script>
+    <script src="static/js/sequence-validator.js"></script>
+    <script src="static/js/menubar.js"></script>
+    <script src="static/js/image-export.js"></script>
+    <script src="static/js/editor.js"></script>
+    <script>
+        // Initialize editor when DOM is ready
+        document.addEventListener('DOMContentLoaded', function () {
+            window.vnetEditor = new VNetsEditor({
+                canvasId: 'vnet-canvas',
+                paletteId: 'vnet-palette'
+            });
+            
+            // Initialize menu bar
+            window.vnetMenuBar = new VNetMenuBar('vnet-menubar', window.vnetEditor);
+        });
+    </script>
 </body>
+
 </html>

@@ -1,0 +1,4 @@
+Frec(A)>=3
+Frec(D)>=5
+A->B before C
+Frec(B)>=2 ∧ Frec(C)>=2
