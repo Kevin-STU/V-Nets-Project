@@ -39,10 +39,14 @@ const SequenceValidator = {
             }
         } else {
             // Formato solo nombres
-            const separators = /[,\-\>→]+/;
+            const separators = /[\s,\-\>→;]+/;
             const names = normalized.split(separators)
                 .map(n => n.trim())
                 .filter(n => n && /^[a-zA-Z0-9_]+$/.test(n));
+            
+            console.log('   🔍 Parsing formato "solo nombres":');
+            console.log('      Input normalizado:', normalized);
+            console.log('      Nombres extraídos:', names);
             
             names.forEach(name => {
                 events.push({ name, time: null });
@@ -321,6 +325,21 @@ const SequenceValidator = {
         };
 
         return results;
+    },
+
+    // Algoritmo 2 del artículo: Obtener restricción temporal entre eventos
+    getTimeConstraint(connection) {
+        return {
+            minTime: connection.minTime,
+            maxTime: connection.maxTime
+        };
+    },
+
+    // Algoritmo 2 del artículo: Verificar si el tiempo está dentro de la restricción
+    checkTimeConstraint(actualTimeDiff, expectedConstraint) {
+        // Según el artículo: if (ti+1 - ti) is not within Texpected then return False
+        const { minTime, maxTime } = expectedConstraint;
+        return actualTimeDiff >= minTime && (maxTime === Infinity || actualTimeDiff <= maxTime);
     }
 };
 
@@ -329,6 +348,9 @@ const SequenceValidatorDialog = {
     show(vnet) {
         // Obtener nombres de eventos para autocompletado
         const eventNames = Object.values(vnet.events).map(e => e.name);
+
+        console.log('🔍 SequenceValidatorDialog.show() iniciado');
+        console.log('   Eventos:', eventNames);
 
         const html = `
             <div class="modal-overlay" id="sequenceValidatorModal">
@@ -341,7 +363,7 @@ const SequenceValidatorDialog = {
                         <div class="form-group">
                             <label for="sequenceInput">Ingrese la secuencia a validar:</label>
                             <textarea id="sequenceInput" class="form-control sequence-input" rows="5" 
-                                placeholder="Formatos aceptados:&#10;&#10;1. Con tiempos: Init(0), ProcessA(3), End(10)&#10;2. Sin tiempos: Init, ProcessA, End&#10;3. Con flechas: Init → ProcessA → End&#10;4. Tabla (una por línea):&#10;   Init | 0&#10;   ProcessA | 3&#10;   End | 10"></textarea>
+                                placeholder="Formatos aceptados:&#10;&#10;1. Con tiempos: A(0), B(3), D(10)&#10;2. Sin tiempos: A, B, D&#10;3. Con flechas: A → B → D&#10;4. Tabla (una por línea):&#10;   A | 0&#10;   B | 3&#10;   D | 10"></textarea>
                         </div>
 
                         <div class="events-hint">
@@ -364,6 +386,8 @@ const SequenceValidatorDialog = {
 
         document.getElementById('vnet-modal-container').innerHTML = html;
         this._vnet = vnet;
+        
+        console.log('   ✅ Modal creado e inyectado en el DOM');
     },
 
     insertEvent(name) {
@@ -383,25 +407,39 @@ const SequenceValidatorDialog = {
         const input = document.getElementById('sequenceInput').value;
         const eventNames = Object.values(this._vnet.events).map(e => e.name);
 
+        console.log('🔍 SequenceValidator.validate() iniciado');
+        console.log('   Input:', input);
+        console.log('   Eventos disponibles:', eventNames);
+
         // Parsear secuencia
         let sequence = SequenceValidator.parseSequence(input, eventNames);
 
+        console.log('   Secuencia parseada:', sequence);
+
         if (sequence.length === 0) {
+            console.error('❌ No se pudo interpretar la secuencia');
             document.getElementById('validationResults').innerHTML = `
                 <div class="validation-result error">
                     <h4>Error de Formato</h4>
                     <p>No se pudo interpretar la secuencia. Verifique el formato.</p>
+                    <p>Intentó parsear: "${input}"</p>
+                    <p>Eventos disponibles: ${eventNames.join(', ')}</p>
                 </div>
             `;
             return;
         }
 
+        console.log('   Asignando tiempos automáticos...');
         // Asignar tiempos automáticos si es necesario
         sequence = SequenceValidator.assignAutoTimes(sequence, this._vnet);
+        
+        console.log('   Secuencia con tiempos:', sequence);
 
+        console.log('   Validando contra vnet...');
         // Validar
         const result = SequenceValidator.validate(sequence, this._vnet);
 
+        console.log('   Resultado de validación:', result);
         this.showResults(result, sequence);
     },
 
@@ -489,21 +527,6 @@ const SequenceValidatorDialog = {
         `;
 
         document.getElementById('validationResults').innerHTML = html;
-    },
-
-    // Algoritmo 2 del artículo: Obtener restricción temporal entre eventos
-    getTimeConstraint(connection) {
-        return {
-            minTime: connection.minTime,
-            maxTime: connection.maxTime
-        };
-    },
-
-    // Algoritmo 2 del artículo: Verificar si el tiempo está dentro de la restricción
-    checkTimeConstraint(actualTimeDiff, expectedConstraint) {
-        // Según el artículo: if (ti+1 - ti) is not within Texpected then return False
-        const { minTime, maxTime } = expectedConstraint;
-        return actualTimeDiff >= minTime && (maxTime === Infinity || actualTimeDiff <= maxTime);
     }
 };
 
