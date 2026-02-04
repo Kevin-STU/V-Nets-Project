@@ -50,9 +50,6 @@ class VNetsEditor {
             window.VNetDialogs.showAlert('Error de Validación', message, 'error');
         };
 
-        // Guardar estado inicial para undo
-        this.vnet.saveUndoState('Estado inicial');
-
         console.log('V-Nets Editor initialized');
     }
 

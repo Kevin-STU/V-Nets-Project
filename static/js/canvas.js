@@ -286,6 +286,10 @@ class VNetCanvas {
             }
         });
 
+        // Stage mouseup handler - para detectar clics cuando el sistema de eventos normal falla
+        // Nota: El manejo de mouseup en modo conexión se hace en setupEventGraphicHandlers
+        // para cada grupo de evento, NO aquí en el stage
+
         // Mouse move for connection preview
         this.stage.on('mousemove', (e) => {
             if (this.isConnecting && this.tempLine) {
@@ -314,10 +318,20 @@ class VNetCanvas {
 
     setTool(tool) {
         this.currentTool = tool;
-        this.container.style.cursor = tool === 'connect' ? 'crosshair' : 'default';
+        
+        // Cambiar cursor según herramienta
+        if (tool === 'connect') {
+            this.container.style.cursor = 'crosshair';
+        } else {
+            this.container.style.cursor = 'default';
+        }
+        
+        // Si cambio a otra herramienta, cancelar cualquier conexión en progreso
         if (tool !== 'connect') {
             this.cancelConnection();
         }
+
+        console.log(`Herramienta cambiada a: ${tool}`);
     }
 
     // Add event to canvas
@@ -338,6 +352,7 @@ class VNetCanvas {
             x: event.position.x,
             y: event.position.y,
             draggable: true,
+            dragDistance: 0, // Sin dragDistance para máxima compatibilidad
             id: event.id,
             name: 'eventGroup'
         });
@@ -347,12 +362,18 @@ class VNetCanvas {
         const height = 60;
         let bgColor, shapeColor, shape;
 
-        // Create a hit region for the entire group
+        // Crear área de hit ampliada para facilitar clics en modo conexión
+        // Cuando hay muchas conexiones, necesitamos área grande para ser clickeable
+        const hitPadding = 40; // Aumentado para mejor experiencia
         const hitRect = new Konva.Rect({
-            width: width,
-            height: height,
-            fill: 'transparent',
-            listening: true
+            x: -hitPadding,
+            y: -hitPadding,
+            width: width + hitPadding * 2,
+            height: height + hitPadding * 2,
+            fill: 'rgba(0,0,0,0.001)', // Casi invisible pero detectable
+            stroke: null,
+            listening: true,
+            hitStrokeWidth: 0
         });
         group.add(hitRect);
 
@@ -459,30 +480,75 @@ class VNetCanvas {
     }
 
     setupEventGraphicHandlers(group, event) {
-        // Drag handlers
+        // Variables para rastrear posición del ratón
+        let mouseDownPos = null;
+        let wasDragged = false;
+
+        // Mousedown - rastrear posición inicial
+        group.on('mousedown', (e) => {
+            e.cancelBubble = true;
+            const pos = this.stage.getPointerPosition();
+            mouseDownPos = { x: pos.x, y: pos.y };
+            wasDragged = false;
+
+            // En modo conexión, deshabilitar drag
+            if (this.currentTool === 'connect') {
+                group.draggable(false);
+            }
+        });
+
+        // Drag handlers - solo si NO estamos en modo conexión
         group.on('dragmove', () => {
-            event.position.x = group.x();
-            event.position.y = group.y();
-            this.updateConnectionsForEvent(event);
+            if (this.currentTool !== 'connect') {
+                wasDragged = true;
+                event.position.x = group.x();
+                event.position.y = group.y();
+                this.updateConnectionsForEvent(event);
+            }
         });
 
         group.on('dragend', () => {
-            this.vnet.changed = true;
+            if (this.currentTool !== 'connect') {
+                this.vnet.changed = true;
+                // Rehabilitar drag para futuras operaciones
+                group.draggable(true);
+            }
         });
 
-        // Click handler
-        group.on('click', (e) => {
+        // Mouseup - es donde detectamos el "click"
+        group.on('mouseup', (e) => {
             e.cancelBubble = true;
+            
+            // Verificar si fue realmente un clic (no un drag)
+            if (mouseDownPos) {
+                const pos = this.stage.getPointerPosition();
+                const distance = Math.sqrt(
+                    Math.pow(pos.x - mouseDownPos.x, 2) + 
+                    Math.pow(pos.y - mouseDownPos.y, 2)
+                );
+                mouseDownPos = null;
 
-            if (this.currentTool === 'connect') {
-                if (!this.isConnecting) {
-                    this.startConnection(group);
-                } else if (this.connectionSource !== group) {
-                    this.finishConnection(group);
+                // Si la distancia es pequeña (< 10px), considerarlo un click
+                if (distance < 10 && !wasDragged) {
+                    if (this.currentTool === 'connect') {
+                        if (!this.isConnecting) {
+                            console.log(`✓ Iniciando conexión desde: ${event.name}`);
+                            this.startConnection(group);
+                        } else if (this.connectionSource !== group) {
+                            console.log(`✓ Completando conexión a: ${event.name}`);
+                            this.finishConnection(group);
+                        } else {
+                            console.log('Mismo evento, cancelando');
+                            this.cancelConnection();
+                        }
+                    } else {
+                        this.selectItem(group);
+                    }
                 }
-            } else {
-                this.selectItem(group);
             }
+
+            // Rehabilitar drag después del mouseup
+            group.draggable(true);
         });
 
         // Double click for properties
@@ -499,22 +565,64 @@ class VNetCanvas {
 
         // Hover effect
         group.on('mouseenter', () => {
-            document.body.style.cursor = 'pointer';
-            group.opacity(0.9);
+            if (this.currentTool === 'connect') {
+                document.body.style.cursor = 'pointer';
+                const bgRect = group.children[1];
+                if (bgRect && bgRect.className === 'Rect') {
+                    bgRect.strokeWidth(4);
+                    bgRect.stroke('#2196F3');
+                }
+            } else {
+                document.body.style.cursor = 'pointer';
+            }
+            group.opacity(0.85);
             this.eventsLayer.batchDraw();
         });
 
         group.on('mouseleave', () => {
             document.body.style.cursor = this.currentTool === 'connect' ? 'crosshair' : 'default';
             group.opacity(1);
+            const bgRect = group.children[1];
+            if (bgRect && bgRect.className === 'Rect') {
+                if (this.isConnecting && this.connectionSource === group) {
+                    bgRect.strokeWidth(4);
+                    bgRect.stroke('#4CAF50');
+                } else {
+                    bgRect.strokeWidth(2);
+                    bgRect.stroke('#3c3c3c');
+                }
+            }
             this.eventsLayer.batchDraw();
         });
     }
 
     startConnection(sourceGroup) {
+        const sourceEvent = sourceGroup.eventData;
+        
+        // Validación: no puedo conectar desde un END
+        if (sourceEvent.eventType === 'end') {
+            window.VNetDialogs.showAlert(
+                'Conexión no válida',
+                'Los eventos END no pueden tener conexiones salientes.',
+                'error'
+            );
+            return;
+        }
+
+        // Marcar que estamos conectando
         this.isConnecting = true;
         this.connectionSource = sourceGroup;
 
+        // Resaltar visualmente el origen
+        const bgRect = sourceGroup.children[1];
+        if (bgRect && bgRect.className === 'Rect') {
+            bgRect.strokeWidth(4);
+            bgRect.stroke('#4CAF50');
+        }
+        this.eventsLayer.batchDraw();
+
+        // Crear línea temporal desde el centro del evento
+        // Usar getAbsolutePosition() que ya maneja zoom/pan correctamente
         const pos = sourceGroup.getAbsolutePosition();
         const centerX = pos.x + 40;
         const centerY = pos.y + 30;
@@ -523,76 +631,119 @@ class VNetCanvas {
             points: [centerX, centerY, centerX, centerY],
             stroke: '#666',
             strokeWidth: 2,
-            pointerLength: 8,
-            pointerWidth: 6,
-            dash: [5, 5]
+            pointerLength: 10,
+            pointerWidth: 8,
+            dash: [5, 5],
+            listening: false  // No debe interceptar eventos
         });
 
         this.tempLayer.add(this.tempLine);
         this.tempLayer.batchDraw();
+
+        console.log(`✓ Conexión iniciada desde: ${sourceEvent.name} (${sourceEvent.eventType})`);
     }
 
     finishConnection(targetGroup) {
-        if (!this.connectionSource || this.connectionSource === targetGroup) {
+        // Validación básica
+        if (!this.connectionSource) {
             this.cancelConnection();
+            return;
+        }
+
+        if (this.connectionSource === targetGroup) {
             return;
         }
 
         const sourceEvent = this.connectionSource.eventData;
         const targetEvent = targetGroup.eventData;
 
-        console.log(`Intentando conectar: ${sourceEvent.name} (${sourceEvent.eventType}) → ${targetEvent.name} (${targetEvent.eventType})`);
+        console.log(`Conectando: ${sourceEvent.name} → ${targetEvent.name}`);
 
         // Validar restricciones de V-Net
-        let errorMsg = null;
-
         if (sourceEvent.eventType === 'end') {
-            errorMsg = 'Un evento END no puede tener conexiones salientes.';
-        }
-
-        if (errorMsg) {
-            console.log('Error de validación:', errorMsg);
-            window.VNetDialogs.showAlert('Conexión no válida', errorMsg, 'error');
+            window.VNetDialogs.showAlert(
+                'Conexión no válida',
+                'Un evento END no puede tener conexiones salientes.',
+                'error'
+            );
             this.cancelConnection();
             return;
         }
 
-        // Create connection in model
+        // Crear la conexión en el modelo
         const connection = new window.VNetModels.Connection(sourceEvent, targetEvent);
         const added = this.vnet.addConnection(connection);
 
         if (added) {
-            console.log('Conexión creada exitosamente');
-            // Create graphic
+            console.log(`✓ Conexión creada: ${sourceEvent.name} → ${targetEvent.name}`);
+            
+            // Crear la representación gráfica
             const connectionGraphic = this.createConnectionGraphic(connection);
             connection.graphicItem = connectionGraphic;
             this.connectionsLayer.add(connectionGraphic);
             this.connectionsLayer.batchDraw();
         } else {
-            console.log('Falló al crear la conexión en el modelo');
-            // Mostrar error genérico si la conexión no se pudo agregar
-            window.VNetDialogs.showAlert('Error', 'No se pudo crear la conexión. Verifica que no exista ya.', 'error');
+            window.VNetDialogs.showAlert(
+                'Error',
+                'No se pudo crear la conexión. Verifica que no exista ya.',
+                'error'
+            );
         }
 
         this.cancelConnection();
     }
 
     cancelConnection() {
+        // Restaurar visual del evento source
+        if (this.connectionSource) {
+            const bgRect = this.connectionSource.children[1];
+            if (bgRect && bgRect.className === 'Rect') {
+                bgRect.strokeWidth(2);
+                bgRect.stroke('#3c3c3c');
+            }
+            this.connectionSource.opacity(1);
+        }
+
         this.isConnecting = false;
         this.connectionSource = null;
+        
         if (this.tempLine) {
             this.tempLine.destroy();
             this.tempLine = null;
-            this.tempLayer.batchDraw();
         }
+        
+        this.tempLayer.batchDraw();
+        this.eventsLayer.batchDraw();
     }
 
     createConnectionGraphic(connection) {
-        const group = new Konva.Group({ id: connection.id });
+        try {
+            console.log('🟣 createConnectionGraphic() - Inicio');
+            console.log('📊 Conexión:', {
+                id: connection.id,
+                source: connection.source?.name || 'NO EXISTE',
+                target: connection.target?.name || 'NO EXISTE',
+                hasGraphics: !!connection.source?.graphicItem && !!connection.target?.graphicItem
+            });
 
-        // Get positions
-        const sourcePos = connection.source.graphicItem.getAbsolutePosition();
-        const targetPos = connection.target.graphicItem.getAbsolutePosition();
+            const group = new Konva.Group({ id: connection.id });
+
+            // Get positions
+            const sourceGraphic = connection.source.graphicItem;
+            const targetGraphic = connection.target.graphicItem;
+
+            if (!sourceGraphic || !targetGraphic) {
+                console.error('❌ Gráficos de eventos no existen:', {
+                    sourceGraphic: !!sourceGraphic,
+                    targetGraphic: !!targetGraphic
+                });
+                return group;
+            }
+
+            const sourcePos = sourceGraphic.getAbsolutePosition();
+            const targetPos = targetGraphic.getAbsolutePosition();
+
+            console.log('📊 Posiciones:', { sourcePos, targetPos });
 
         const startX = sourcePos.x + 40;
         const startY = sourcePos.y + 30;
@@ -652,7 +803,8 @@ class VNetCanvas {
             fill: 'white',
             stroke: connection.hasInverse ? '#9b59b6' : '#ccc',
             strokeWidth: connection.hasInverse ? 2 : 1,
-            cornerRadius: 4
+            cornerRadius: 4,
+            listening: false  // No necesita escuchar eventos
         });
         group.add(labelBg);
 
@@ -666,7 +818,8 @@ class VNetCanvas {
             fontSize: 11,
             fontFamily: 'Arial',
             fill: '#333',
-            align: 'center'
+            align: 'center',
+            listening: false  // No necesita escuchar eventos
         });
         group.add(labelText);
 
@@ -683,7 +836,8 @@ class VNetCanvas {
                 fontFamily: 'Arial',
                 fill: '#e67e22',
                 align: 'center',
-                fontStyle: 'italic'
+                fontStyle: 'italic',
+                listening: false  // No necesita escuchar eventos
             });
             group.add(inverseLabelText);
         }
@@ -698,7 +852,13 @@ class VNetCanvas {
         // Event handlers
         this.setupConnectionGraphicHandlers(group, connection);
 
+        console.log('🟣 createConnectionGraphic() - Completado exitosamente');
         return group;
+        } catch (error) {
+            console.error('❌ ERROR en createConnectionGraphic:', error);
+            console.error('Stack:', error.stack);
+            return group;  // Retornar grupo vacío para evitar crash
+        }
     }
 
     calculateCurvePoints(startX, startY, endX, endY, isInverse = false) {
@@ -767,16 +927,40 @@ class VNetCanvas {
     }
 
     updateConnectionGraphic(connection) {
-        const oldGroup = connection.graphicItem;
-        if (!oldGroup) return;
+        try {
+            const oldGroup = connection.graphicItem;
+            if (!oldGroup) {
+                console.error('❌ No hay grupo antiguo para actualizar');
+                return;
+            }
 
-        // Destruir el gráfico antiguo
-        oldGroup.destroy();
+            console.log(`📍 [1/5] Actualizando conexión: ${connection.source.name} → ${connection.target.name}`);
+            console.log(`📍 [2/5] Datos de conexión:`, {
+                minTime: connection.minTime,
+                maxTime: connection.maxTime,
+                hasInverse: connection.hasInverse,
+                sourceExists: !!connection.source,
+                targetExists: !!connection.target
+            });
 
-        // Crear uno nuevo con los datos actualizados
-        const newGroup = this.createConnectionGraphic(connection);
-        connection.graphicItem = newGroup;
-        this.connectionsLayer.add(newGroup);
+            // Destruir el gráfico antiguo
+            console.log(`📍 [3/5] Destruyendo grupo antiguo...`);
+            oldGroup.destroy();
+
+            // Crear uno nuevo con los datos actualizados
+            console.log(`📍 [4/5] Creando nuevo grupo...`);
+            const newGroup = this.createConnectionGraphic(connection);
+            connection.graphicItem = newGroup;
+            this.connectionsLayer.add(newGroup);
+            
+            console.log(`📍 [5/5] Redibujando capa...`);
+            this.connectionsLayer.batchDraw();
+            
+            console.log(`✅ Conexión actualizada correctamente`);
+        } catch (error) {
+            console.error('❌ ERROR al actualizar conexión:', error);
+            console.error('Stack:', error.stack);
+        }
     }
 
     // Actualizar solo posiciones (cuando se arrastra un evento)
@@ -825,11 +1009,11 @@ class VNetCanvas {
 
         // Add selection highlight
         if (item.eventData) {
-            // It's an event
-            const rect = item.findOne('Rect');
-            if (rect) {
-                rect.stroke('#3498db');
-                rect.strokeWidth(3);
+            // It's an event - obtener el rectángulo visual (children[1])
+            const bgRect = item.children[1];
+            if (bgRect && bgRect.className === 'Rect') {
+                bgRect.stroke('#3498db');
+                bgRect.strokeWidth(3);
             }
             this.eventsLayer.batchDraw();
         } else if (item.connectionData) {
@@ -842,10 +1026,11 @@ class VNetCanvas {
     deselectAll() {
         if (this.selectedItem) {
             if (this.selectedItem.eventData) {
-                const rect = this.selectedItem.findOne('Rect');
-                if (rect) {
-                    rect.stroke('#3c3c3c');
-                    rect.strokeWidth(2);
+                // Restaurar el rectángulo visual (children[1])
+                const bgRect = this.selectedItem.children[1];
+                if (bgRect && bgRect.className === 'Rect') {
+                    bgRect.stroke('#3c3c3c');
+                    bgRect.strokeWidth(2);
                 }
                 this.eventsLayer.batchDraw();
             } else if (this.selectedItem.connectionData) {
@@ -894,11 +1079,38 @@ class VNetCanvas {
     }
 
     showConnectionProperties(connection) {
+        console.log('🔵 showConnectionProperties() - Inicio');
+        console.log('📊 Conexión recibida:', {
+            id: connection.id,
+            source: connection.source.name,
+            target: connection.target.name,
+            minTime: connection.minTime,
+            maxTime: connection.maxTime
+        });
+        
+        // ✅ VERIFICACIÓN CRÍTICA: Asegurarse que la conexión existe en vnet.connections ANTES
+        console.log('🔴 VERIFICACIÓN PREVIA: conexiones en vnet:', Object.keys(this.vnet.connections));
+        if (!this.vnet.connections[connection.id]) {
+            console.error('❌ ¡CRÍTICO! Conexión NO está en vnet ANTES de abrir el diálogo:', connection.id);
+        }
+
         if (window.VNetDialogs) {
             window.VNetDialogs.showConnectionDialog(connection, () => {
+                console.log('🔵 Callback ejecutado');
+                console.log('📊 Valores actualizados en la conexión:',{
+                    minTime: connection.minTime,
+                    maxTime: connection.maxTime,
+                    hasInverse: connection.hasInverse
+                });
+                
+                // ✅ ARREGLO CRÍTICO: Simplemente actualizar el gráfico, sin verificar
+                // El objeto connection YA tiene los valores actualizados desde dialogs.js
+                console.log('📍 Actualizando gráfico de conexión...');
                 this.updateConnectionGraphic(connection);
-                this.connectionsLayer.batchDraw();
+                console.log('✅ Gráfico actualizado correctamente');
             });
+        } else {
+            console.error('❌ window.VNetDialogs no está disponible');
         }
     }
 

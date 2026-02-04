@@ -153,7 +153,7 @@ class EventNode {
         const node = new EventNode(data.eventType, data.position);
         node.id = data.id;
         node.name = data.name;
-        node.minTime = data.minTime || 0;
+        node.minTime = data.minTime !== undefined && data.minTime !== null ? data.minTime : 0;
         node.maxTime = data.maxTime === null ? Infinity : data.maxTime;
         node.frequency = data.frequency || 1;
         return node;
@@ -246,6 +246,8 @@ class VNetGraph {
 
     // Guardar estado actual para undo
     saveUndoState(description = '') {
+        // DESHABILITADO: causaba que se perdieran conexiones
+        return;
         if (this._isRestoringState) return;
 
         const state = {
@@ -368,6 +370,7 @@ class VNetGraph {
         this._isRestoringState = false;
         this.changed = true;
         
+        // Notificar que el grafo cambió
         if (this.onGraphChanged) this.onGraphChanged();
     }
 
@@ -380,19 +383,17 @@ class VNetGraph {
     }
 
     addEvent(event, saveUndo = true) {
-        if (saveUndo) this.saveUndoState('Agregar evento');
-        
         this.events[event.id] = event;
         this.changed = true;
         if (this.onGraphChanged) this.onGraphChanged();
+        
+        // NO guardar undo state automáticamente
         return event;
     }
 
     removeEvent(eventId, saveUndo = true) {
         const event = this.events[eventId];
         if (!event) return;
-
-        if (saveUndo) this.saveUndoState('Eliminar evento');
 
         // Remove connections associated with this event
         const connectionsToRemove = [
@@ -404,19 +405,19 @@ class VNetGraph {
         delete this.events[eventId];
         this.changed = true;
         if (this.onGraphChanged) this.onGraphChanged();
+        
+        // Guardar el undo state DESPUÉS de remover el evento
+        if (saveUndo) this.saveUndoState('Eliminar evento');
     }
 
     addConnection(connection, saveUndo = true) {
         console.log(`addConnection llamado: ${connection.source.name} → ${connection.target.name}`);
 
-        // Validar restricciones semánticas de V-Net
-        // Un evento END no puede tener conexiones salientes
         if (connection.source.eventType === 'end') {
             console.warn('Un evento END no puede tener conexiones salientes');
             return null;
         }
 
-        // Check if connection already exists
         const existing = Object.values(this.connections).find(
             c => c.source.id === connection.source.id && c.target.id === connection.target.id
         );
@@ -427,13 +428,14 @@ class VNetGraph {
 
         console.log('Conexión válida, agregando al modelo');
 
-        if (saveUndo) this.saveUndoState('Agregar conexión');
-
         this.connections[connection.id] = connection;
         connection.source.outgoing.push(connection);
         connection.target.incoming.push(connection);
         this.changed = true;
         if (this.onGraphChanged) this.onGraphChanged();
+        
+        console.log(`Conexión agregada. Total: ${Object.keys(this.connections).length}`);
+
         return connection;
     }
 
@@ -441,8 +443,7 @@ class VNetGraph {
         const connection = this.connections[connectionId];
         if (!connection) return;
 
-        if (saveUndo) this.saveUndoState('Eliminar conexión');
-
+        // Remover la conexión PRIMERO
         // Remove from source's outgoing
         const sourceIdx = connection.source.outgoing.findIndex(c => c.id === connectionId);
         if (sourceIdx !== -1) connection.source.outgoing.splice(sourceIdx, 1);
@@ -454,6 +455,9 @@ class VNetGraph {
         delete this.connections[connectionId];
         this.changed = true;
         if (this.onGraphChanged) this.onGraphChanged();
+        
+        // DESPUÉS guardar el undo state con la conexión ya removida
+        if (saveUndo) this.saveUndoState('Eliminar conexión');
     }
 
     // Guardar estado antes de modificar propiedades
@@ -574,8 +578,8 @@ class VNetGraph {
         const allEvents = Object.values(this.events);
         const endIds = new Set(endEvents.map(e => e.id));
         
-        // Para cada INIT, hacer BFS para ver si llega a algún END
-        const reachableFromInit = new Map(); // eventId -> Set de IDs de INITs que pueden alcanzarlo
+        // Eventos alcanzables desde cualquier INIT (forward reachability)
+        const reachableFromAnyInit = new Set();
         const initsThatReachEnd = new Set();
         const endsReachedFromInit = new Set();
 
@@ -583,19 +587,15 @@ class VNetGraph {
             const visited = new Set();
             const queue = [initEvent];
             visited.add(initEvent.id);
+            reachableFromAnyInit.add(initEvent.id);
+            let reachesEnd = false;
 
             while (queue.length > 0) {
                 const current = queue.shift();
-                
-                // Marcar como alcanzable desde este INIT
-                if (!reachableFromInit.has(current.id)) {
-                    reachableFromInit.set(current.id, new Set());
-                }
-                reachableFromInit.get(current.id).add(initEvent.id);
 
                 // Si llegamos a un END, marcar éxito
                 if (endIds.has(current.id)) {
-                    initsThatReachEnd.add(initEvent.id);
+                    reachesEnd = true;
                     endsReachedFromInit.add(current.id);
                 }
 
@@ -603,26 +603,32 @@ class VNetGraph {
                 for (const conn of current.outgoing) {
                     if (!visited.has(conn.target.id)) {
                         visited.add(conn.target.id);
+                        reachableFromAnyInit.add(conn.target.id);
                         queue.push(conn.target);
                     }
                 }
             }
+            
+            if (reachesEnd) {
+                initsThatReachEnd.add(initEvent.id);
+            }
         }
 
-        // Eventos alcanzables yendo hacia atrás desde END
-        const reachableToEnd = new Set();
+        // Eventos que pueden alcanzar algún END (backward reachability)
+        const canReachEnd = new Set();
         for (const endEvent of endEvents) {
             const visited = new Set();
             const queue = [endEvent];
             visited.add(endEvent.id);
+            canReachEnd.add(endEvent.id);
 
             while (queue.length > 0) {
                 const current = queue.shift();
-                reachableToEnd.add(current.id);
 
                 for (const conn of current.incoming) {
                     if (!visited.has(conn.source.id)) {
                         visited.add(conn.source.id);
+                        canReachEnd.add(conn.source.id);
                         queue.push(conn.source);
                     }
                 }
@@ -630,8 +636,9 @@ class VNetGraph {
         }
 
         // Encontrar eventos no alcanzables en ningún camino válido
+        // Un evento está desconectado si: NO es alcanzable desde INIT O NO puede alcanzar END
         const unreachableEvents = allEvents.filter(e => 
-            !reachableFromInit.has(e.id) || !reachableToEnd.has(e.id)
+            !reachableFromAnyInit.has(e.id) || !canReachEnd.has(e.id)
         );
 
         return {
@@ -785,7 +792,7 @@ class VNetGraph {
             const event = new EventNode(eventData.type || eventData.eventType, position);
             event.id = eventData.id || id;
             event.name = eventData.name;
-            event.minTime = eventData.min_time || 0;
+            event.minTime = eventData.min_time !== undefined && eventData.min_time !== null ? eventData.min_time : 0;
             event.maxTime = eventData.max_time === null || eventData.max_time === undefined 
                 ? Infinity : eventData.max_time;
             event.frequency = eventData.frequency || 1;
@@ -799,13 +806,10 @@ class VNetGraph {
             const target = graph.events[connData.target];
             
             if (source && target) {
-                const conn = new Connection(
-                    source,
-                    target,
-                    connData.min_time || 0,
-                    connData.max_time === null || connData.max_time === undefined 
-                        ? Infinity : connData.max_time
-                );
+                const minTimeVal = connData.min_time !== undefined && connData.min_time !== null ? connData.min_time : 0;
+                const maxTimeVal = connData.max_time === null || connData.max_time === undefined 
+                    ? Infinity : connData.max_time;
+                const conn = new Connection(source, target, minTimeVal, maxTimeVal);
                 conn.id = connData.id || id;
                 conn.sourceFrequency = connData.source_frequency || 1;
                 conn.targetFrequency = connData.target_frequency || 1;

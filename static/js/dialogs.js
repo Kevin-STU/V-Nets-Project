@@ -74,16 +74,20 @@ const VNetDialogs = {
         }
 
         if (this._currentEvent) {
-            // Guardar estado para undo (si el vnet está disponible)
-            if (window.vnetEditor && window.vnetEditor.vnet) {
-                window.vnetEditor.vnet.savePropertiesState('Modificar evento');
-            }
-            
+            // Aplicar los cambios
             this._currentEvent.name = name;
             this._currentEvent.frequency = Math.max(1, frequency);
+            
+            // NO guardar undo state - estaba causando problemas
+            console.log('Evento modificado:', this._currentEvent.name);
         }
 
         this.closeModal('eventModal');
+        
+        // Desseleccionar el evento después de cerrar el modal
+        if (window.vnetEditor && window.vnetEditor.canvas) {
+            window.vnetEditor.canvas.deselectAll();
+        }
 
         if (this._eventSaveCallback) {
             this._eventSaveCallback();
@@ -285,18 +289,29 @@ const VNetDialogs = {
     },
 
     saveConnectionDialog() {
+        console.log('🟡 Guardando conexión - Inicio');
+        
         // Restricción directa
-        const minTime = parseFloat(document.getElementById('minTime').value) || 0;
+        const minTimeInput = document.getElementById('minTime').value;
+        const minTime = minTimeInput !== '' ? parseFloat(minTimeInput) : 0;
         const hasMaxTime = document.getElementById('hasMaxTime').checked;
-        const maxTime = hasMaxTime ? (parseFloat(document.getElementById('maxTime').value) || Infinity) : Infinity;
+        const maxTimeInput = document.getElementById('maxTime').value;
+        const maxTime = hasMaxTime ? (maxTimeInput !== '' ? parseFloat(maxTimeInput) : Infinity) : Infinity;
         const sourceFreq = parseInt(document.getElementById('sourceFreq').value) || 1;
         const targetFreq = parseInt(document.getElementById('targetFreq').value) || 1;
 
         // Restricción inversa
         const hasInverse = document.getElementById('hasInverse').checked;
-        const inverseMinTime = parseFloat(document.getElementById('inverseMinTime').value) || 0;
+        const inverseMinTimeInput = document.getElementById('inverseMinTime').value;
+        const inverseMinTime = inverseMinTimeInput !== '' ? parseFloat(inverseMinTimeInput) : 0;
         const hasInverseMaxTime = document.getElementById('hasInverseMaxTime').checked;
-        const inverseMaxTime = hasInverseMaxTime ? (parseFloat(document.getElementById('inverseMaxTime').value) || Infinity) : Infinity;
+        const inverseMaxTimeInput = document.getElementById('inverseMaxTime').value;
+        const inverseMaxTime = hasInverseMaxTime ? (inverseMaxTimeInput !== '' ? parseFloat(inverseMaxTimeInput) : Infinity) : Infinity;
+
+        console.log('🟡 Valores parseados:', {
+            minTime, maxTime, hasMaxTime, sourceFreq, targetFreq,
+            hasInverse, inverseMinTime, inverseMaxTime
+        });
 
         // Validaciones
         if (hasMaxTime && minTime > maxTime) {
@@ -310,12 +325,8 @@ const VNetDialogs = {
         }
 
         if (this._currentConnection) {
-            // Guardar estado para undo
-            if (window.vnetEditor && window.vnetEditor.vnet) {
-                window.vnetEditor.vnet.savePropertiesState('Modificar conexión');
-            }
-            
-            // Guardar restricción directa
+            console.log('🟡 Conexión encontrada, aplicando cambios...');
+            // Aplicar los cambios
             this._currentConnection.minTime = Math.max(0, minTime);
             this._currentConnection.maxTime = maxTime;
             this._currentConnection.sourceFrequency = Math.max(1, sourceFreq);
@@ -325,13 +336,26 @@ const VNetDialogs = {
             this._currentConnection.hasInverse = hasInverse;
             this._currentConnection.inverseMinTime = Math.max(0, inverseMinTime);
             this._currentConnection.inverseMaxTime = inverseMaxTime;
+            
+            console.log('🟡 Cambios aplicados a:', this._currentConnection);
+            console.log('🟡 Conexión modificada:', this._currentConnection.source.name, '→', this._currentConnection.target.name);
+        } else {
+            console.error('❌ ERROR: No hay conexión actual (_currentConnection es null)');
         }
 
-        this.closeModal('connectionModal');
-
+        // ✅ ARREGLO CRÍTICO: Ejecutar callback ANTES de cerrar el modal
+        console.log('🟡 Ejecutando callback (ANTES de cerrar modal)...');
         if (this._connectionSaveCallback) {
+            console.log('🟡 Callback encontrado');
             this._connectionSaveCallback();
+            console.log('✅ Callback ejecutado');
+        } else {
+            console.error('❌ ERROR: Callback no existe');
         }
+
+        // Ahora sí cerrar el modal DESPUÉS del callback
+        console.log('🟡 Cerrando modal...');
+        this.closeModal('connectionModal');
     },
 
     // Show context menu
@@ -405,6 +429,13 @@ const VNetDialogs = {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.remove();
+        }
+        
+        // ✅ ARREGLO: Solo desseleccionar para eventModal, NO para connectionModal
+        // El connectionModal no necesita desseleccionar porque solo se editan restricciones
+        if (modalId === 'eventModal' && 
+            window.vnetEditor && window.vnetEditor.canvas) {
+            window.vnetEditor.canvas.deselectAll();
         }
     },
 
