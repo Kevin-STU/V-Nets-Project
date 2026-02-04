@@ -501,7 +501,7 @@
     background: var(--bg-white);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    min-width: 400px;
+    min-width: 450px;
     max-width: 90%;
     max-height: 90vh;
     overflow: hidden;
@@ -531,47 +531,58 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 14px 18px;
     border-bottom: 1px solid var(--border-color);
+    gap: 12px;
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     color: var(--text-color);
+    flex: 1;
 }
 
 .modal-close {
     background: none;
     border: none;
-    font-size: 24px;
+    font-size: 20px;
     color: var(--text-light);
     cursor: pointer;
-    padding: 0;
+    padding: 4px 8px;
     line-height: 1;
     transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    min-height: 28px;
 }
 
 .modal-close:hover {
     color: var(--text-color);
+    background: var(--bg-light);
+    border-radius: var(--radius-sm);
 }
 
 .modal-body {
-    padding: 20px;
+    padding: 16px 18px;
+    max-height: calc(90vh - 160px);
+    overflow-y: auto;
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
-    padding: 16px 20px;
+    gap: 8px;
+    padding: 12px 18px;
     border-top: 1px solid var(--border-color);
     background: var(--bg-light);
 }
 
 /* ==================== Form Elements ==================== */
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .form-group:last-child {
@@ -637,10 +648,10 @@
 
 /* ==================== Buttons ==================== */
 .btn {
-    padding: 10px 20px;
+    padding: 9px 18px;
     border: none;
     border-radius: var(--radius-md);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition);
@@ -1215,22 +1226,32 @@
 /* ==================== Sequence Validator Dialog ==================== */
 .sequence-input {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
     font-size: 13px;
-    line-height: 1.6;
+    font-weight: 500;
+    color: var(--text-color);
 }
 
 .events-hint {
     background: var(--bg-light);
-    padding: 12px 15px;
+    padding: 10px 12px;
     border-radius: var(--radius-md);
-    margin-bottom: 15px;
+    margin: 12px 0;
 }
 
 .events-hint strong {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-light);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .event-chips {
@@ -1240,9 +1261,10 @@
 }
 
 .validation-result {
-    padding: 20px;
+    padding: 15px;
     border-radius: var(--radius-md);
     border: 2px solid;
+    margin-top: 12px;
 }
 
 .validation-result.success {
@@ -1259,13 +1281,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 10px;
 }
 
 .validation-status {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
 }
 
@@ -1278,8 +1300,8 @@
 }
 
 .conformity-meter {
-    width: 200px;
-    height: 24px;
+    width: 180px;
+    height: 20px;
     background: #e0e0e0;
     border-radius: 12px;
     position: relative;
@@ -1316,47 +1338,54 @@
 }
 
 .parsed-sequence {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .parsed-sequence h5 {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-light);
-    margin-bottom: 10px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .sequence-display {
     background: white;
-    padding: 15px;
+    padding: 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
-    line-height: 2;
+    line-height: 1.8;
+    font-size: 12px;
 }
 
 .seq-event {
     display: inline-block;
     background: #e8f4fd;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
     font-weight: 500;
     color: var(--primary-dark);
+    font-size: 11px;
+    margin-right: 4px;
 }
 
 .seq-event small {
     display: block;
-    font-size: 10px;
+    font-size: 9px;
     color: var(--text-light);
     font-weight: normal;
 }
 
 .validation-checks {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .validation-checks h5 {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-light);
-    margin-bottom: 10px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .validation-checks ul {
@@ -1368,12 +1397,13 @@
 .validation-checks li {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 6px 10px;
     background: white;
     border-radius: var(--radius-sm);
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     border: 1px solid var(--border-color);
+    font-size: 11px;
 }
 
 .validation-checks li.passed {
@@ -1385,12 +1415,13 @@
 }
 
 .check-icon {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 1px 5px;
     border-radius: 3px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
 }
 
 .validation-checks li.passed .check-icon {
@@ -1406,18 +1437,20 @@
 .check-name {
     font-weight: 500;
     color: var(--text-color);
+    font-size: 11px;
 }
 
 .check-detail {
-    font-size: 12px;
+    font-size: 10px;
     color: var(--text-light);
     margin-left: auto;
 }
 
 .validation-errors, .validation-warnings {
-    margin-bottom: 15px;
-    padding: 15px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
     border-radius: var(--radius-sm);
+    font-size: 12px;
 }
 
 .validation-errors {
@@ -1429,59 +1462,64 @@
 }
 
 .validation-errors h5, .validation-warnings h5 {
-    font-size: 13px;
-    margin-bottom: 10px;
+    font-size: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .validation-errors ul, .validation-warnings ul {
     margin: 0;
-    padding-left: 20px;
-    font-size: 13px;
+    padding-left: 16px;
+    font-size: 11px;
 }
 
 .validation-errors li {
     color: #b91c1c;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .validation-warnings li {
     color: #92400e;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .validation-summary {
-    margin-top: 15px;
+    margin-top: 10px;
 }
 
 .validation-summary h5 {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-light);
-    margin-bottom: 10px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
 
 .summary-item {
     background: white;
-    padding: 12px;
+    padding: 10px;
     border-radius: var(--radius-sm);
     text-align: center;
     border: 1px solid var(--border-color);
+    font-size: 11px;
 }
 
 .summary-value {
     display: block;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--primary-color);
 }
 
 .summary-label {
-    font-size: 10px;
+    font-size: 9px;
     color: var(--text-light);
     text-transform: uppercase;
 }
