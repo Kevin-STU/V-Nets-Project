@@ -332,6 +332,13 @@ class VNetCanvas {
         }
 
         console.log(`Herramienta cambiada a: ${tool}`);
+        console.log(`🔍 Estado actual de vnet.connections: ${Object.keys(this.vnet.connections).length} conexiones`);
+        if (Object.keys(this.vnet.connections).length > 0) {
+            const connSummary = Object.values(this.vnet.connections)
+                .map(c => `${typeof c.source === 'object' ? c.source.name : c.source} → ${typeof c.target === 'object' ? c.target.name : c.target}`)
+                .join(', ');
+            console.log(`   Conexiones: [${connSummary}]`);
+        }
     }
 
     // Add event to canvas
@@ -599,6 +606,10 @@ class VNetCanvas {
     startConnection(sourceGroup) {
         const sourceEvent = sourceGroup.eventData;
         
+        console.log(`🟢 startConnection() iniciada`);
+        console.log(`   Fuente: ${sourceEvent.name} (${sourceEvent.id})`);
+        console.log(`   Conexiones disponibles en vnet: ${Object.keys(this.vnet.connections).length}`);
+        
         // Validación: no puedo conectar desde un END
         if (sourceEvent.eventType === 'end') {
             window.VNetDialogs.showAlert(
@@ -657,13 +668,54 @@ class VNetCanvas {
         const sourceEvent = this.connectionSource.eventData;
         const targetEvent = targetGroup.eventData;
 
-        console.log(`Conectando: ${sourceEvent.name} → ${targetEvent.name}`);
+        console.log(`🟠 finishConnection() iniciada`);
+        console.log(`   Origen: ${sourceEvent.name} (${sourceEvent.id}) → Destino: ${targetEvent.name} (${targetEvent.id})`);
+        console.log(`   Conexiones en vnet.connections antes de verificar: ${Object.keys(this.vnet.connections).length}`);
 
         // Validar restricciones de V-Net
         if (sourceEvent.eventType === 'end') {
             window.VNetDialogs.showAlert(
                 'Conexión no válida',
                 'Un evento END no puede tener conexiones salientes.',
+                'error'
+            );
+            this.cancelConnection();
+            return;
+        }
+
+        // ✅ ARREGLO CRÍTICO: Verificar si YA EXISTE una conexión entre estos eventos
+        // Manejar ambos casos: source como objeto EventNode O como string ID
+        const getConnectionSourceId = (conn) => {
+            return typeof conn.source === 'object' ? conn.source.id : conn.source;
+        };
+        const getConnectionTargetId = (conn) => {
+            return typeof conn.target === 'object' ? conn.target.id : conn.target;
+        };
+
+        console.log(`   📋 Verificando duplicados...`);
+        console.log(`   Conexiones en el modelo: ${Object.keys(this.vnet.connections).length}`);
+        
+        const allConnections = Object.values(this.vnet.connections);
+        console.log(`   Comparando: ${sourceEvent.id} → ${targetEvent.id}`);
+        
+        allConnections.forEach(conn => {
+            const srcId = getConnectionSourceId(conn);
+            const tgtId = getConnectionTargetId(conn);
+            console.log(`   - Existente: ${srcId} → ${tgtId}`);
+        });
+
+        const existingConnection = allConnections.find(
+            conn => getConnectionSourceId(conn) === sourceEvent.id && 
+                    getConnectionTargetId(conn) === targetEvent.id
+        );
+
+        if (existingConnection) {
+            console.warn('❌ Ya existe una conexión entre estos eventos', existingConnection);
+            console.warn(`   IDs: ${getConnectionSourceId(existingConnection)} → ${getConnectionTargetId(existingConnection)}`);
+            console.warn(`   Solicitada: ${sourceEvent.id} → ${targetEvent.id}`);
+            window.VNetDialogs.showAlert(
+                'Conexión duplicada',
+                `Ya existe una conexión entre ${sourceEvent.name} y ${targetEvent.name}.\nEdítala con doble-clic en la conexión.`,
                 'error'
             );
             this.cancelConnection();
@@ -928,35 +980,45 @@ class VNetCanvas {
 
     updateConnectionGraphic(connection) {
         try {
-            const oldGroup = connection.graphicItem;
-            if (!oldGroup) {
-                console.error('❌ No hay grupo antiguo para actualizar');
+            console.log(`📍 Actualizando conexión: ${connection.source.name} → ${connection.target.name}`);
+            console.log(`📍 Nuevos valores:`, {
+                minTime: connection.minTime,
+                maxTime: connection.maxTime,
+                hasInverse: connection.hasInverse
+            });
+
+            const group = connection.graphicItem;
+            if (!group) {
+                console.error('❌ No hay grupo gráfico para actualizar');
                 return;
             }
 
-            console.log(`📍 [1/5] Actualizando conexión: ${connection.source.name} → ${connection.target.name}`);
-            console.log(`📍 [2/5] Datos de conexión:`, {
-                minTime: connection.minTime,
-                maxTime: connection.maxTime,
-                hasInverse: connection.hasInverse,
-                sourceExists: !!connection.source,
-                targetExists: !!connection.target
-            });
-
-            // Destruir el gráfico antiguo
-            console.log(`📍 [3/5] Destruyendo grupo antiguo...`);
-            oldGroup.destroy();
-
-            // Crear uno nuevo con los datos actualizados
-            console.log(`📍 [4/5] Creando nuevo grupo...`);
-            const newGroup = this.createConnectionGraphic(connection);
-            connection.graphicItem = newGroup;
-            this.connectionsLayer.add(newGroup);
+            // ✅ ARREGLO CRÍTICO: Solo actualizar el TEXTO del label, NO recrear el grupo
+            // Esto evita conflictos cuando se arrastra después
             
-            console.log(`📍 [5/5] Redibujando capa...`);
+            // Actualizar label de restricción directa
+            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+            group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+            
+            // Actualizar label inverso si existe
+            if (connection.hasInverse && group.inverseLabelText) {
+                const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
+                group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
+            }
+
+            // Actualizar color del rectángulo de fondo según hasInverse
+            if (connection.hasInverse) {
+                group.labelBg.stroke('#9b59b6');
+                group.labelBg.strokeWidth(2);
+            } else {
+                group.labelBg.stroke('#ccc');
+                group.labelBg.strokeWidth(1);
+            }
+
+            // Redibujar la capa
             this.connectionsLayer.batchDraw();
             
-            console.log(`✅ Conexión actualizada correctamente`);
+            console.log(`✅ Conexión actualizada correctamente (sin recrear grupo)`);
         } catch (error) {
             console.error('❌ ERROR al actualizar conexión:', error);
             console.error('Stack:', error.stack);
@@ -996,10 +1058,18 @@ class VNetCanvas {
         group.labelText.x(midX - 53);
         group.labelText.y(labelY + 4);
 
+        // ✅ ARREGLO: Actualizar TEXTO del label con los valores actualizados
+        const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+        group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+
         // Update inverse label if exists
         if (group.inverseLabelText) {
             group.inverseLabelText.x(midX - 53);
             group.inverseLabelText.y(labelY + 20);
+            
+            // ✅ ARREGLO: Actualizar TEXTO del label inverso también
+            const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
+            group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
         }
     }
 
@@ -1087,6 +1157,10 @@ class VNetCanvas {
             minTime: connection.minTime,
             maxTime: connection.maxTime
         });
+        
+        // ✅ ARREGLO CRÍTICO: Desseleccionar la conexión ANTES de abrir el modal
+        // Esto previene que si el usuario presiona Delete accidentalmente, se borre la conexión
+        this.deselectAll();
         
         // ✅ VERIFICACIÓN CRÍTICA: Asegurarse que la conexión existe en vnet.connections ANTES
         console.log('🔴 VERIFICACIÓN PREVIA: conexiones en vnet:', Object.keys(this.vnet.connections));

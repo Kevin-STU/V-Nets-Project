@@ -440,8 +440,14 @@ class VNetGraph {
     }
 
     removeConnection(connectionId, saveUndo = true) {
+        console.warn(`🔴 removeConnection() llamado: ${connectionId}`);
+        console.warn(`   Total de conexiones antes: ${Object.keys(this.connections).length}`);
+        
         const connection = this.connections[connectionId];
-        if (!connection) return;
+        if (!connection) {
+            console.error(`   ❌ Conexión no encontrada`);
+            return;
+        }
 
         // Remover la conexión PRIMERO
         // Remove from source's outgoing
@@ -453,6 +459,8 @@ class VNetGraph {
         if (targetIdx !== -1) connection.target.incoming.splice(targetIdx, 1);
 
         delete this.connections[connectionId];
+        console.warn(`   ✅ Conexión removida. Total después: ${Object.keys(this.connections).length}`);
+        
         this.changed = true;
         if (this.onGraphChanged) this.onGraphChanged();
         
