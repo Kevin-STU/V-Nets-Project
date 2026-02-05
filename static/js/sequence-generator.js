@@ -461,6 +461,11 @@ const SequenceGeneratorDialog = {
 
         document.getElementById('vnet-modal-container').innerHTML = html;
         this._vnet = vnet;
+        
+        // 🔐 Marcar modal como abierto para prevenir eliminación accidental
+        if (window.VNetDialogs) {
+            window.VNetDialogs.isModalOpen = true;
+        }
     },
 
     switchTab(tab) {

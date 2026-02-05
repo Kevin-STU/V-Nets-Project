@@ -1553,6 +1553,106 @@
     box-shadow: var(--shadow-sm);
 }
 
+/* ==================== Diagnostics (Fault Detection) ==================== */
+.diagnostics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.diagnostic-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    background: white;
+    border-radius: var(--radius-sm);
+    border-left: 4px solid #ccc;
+    font-size: 12px;
+    align-items: center;
+}
+
+.diagnostic-item.event-fault {
+    border-left-color: #e74c3c;
+    background: #fef2f2;
+}
+
+.diagnostic-item.time-fault {
+    border-left-color: #f39c12;
+    background: #fffbeb;
+}
+
+.diagnostic-item.causality-fault {
+    border-left-color: #9b59b6;
+    background: #f5f3ff;
+}
+
+.diagnostic-item.logic-fault {
+    border-left-color: #3498db;
+    background: #eff6ff;
+}
+
+.diagnostic-item.timeout-fault {
+    border-left-color: #1abc9c;
+    background: #ecfdf5;
+}
+
+.diagnostic-item.frequency-fault {
+    border-left-color: #e67e22;
+    background: #fff7ed;
+}
+
+.diagnostic-type {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.1);
+    color: #333;
+    text-transform: uppercase;
+}
+
+.diagnostic-event {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.diagnostic-detail {
+    flex: 1;
+    color: var(--text-light);
+    font-size: 11px;
+    min-width: 200px;
+}
+
+/* Status badges */
+.status-recognized {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.status-fault {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* Help text */
+.help-text {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+    font-style: italic;
+}
+
 /* ==================== Responsive ==================== */
 @media (max-width: 768px) {
     .editor-container {

@@ -306,6 +306,11 @@ class VNetCanvas {
 
         // Keyboard handler
         document.addEventListener('keydown', (e) => {
+            // 🔐 NO ejecutar acciones de teclado si un modal está abierto
+            if (window.VNetDialogs && window.VNetDialogs.isModalOpen) {
+                return;
+            }
+            
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 this.deleteSelected();
             }
@@ -843,63 +848,123 @@ class VNetCanvas {
         }
 
         // Calcular altura del label según si tiene inversa
-        const labelHeight = connection.hasInverse ? 38 : 24;
-        const labelY = midY - labelHeight / 2;
+        const labelHeight = 24;  // Altura de CADA rectángulo
+        const labelGap = 4;      // Gap entre rectángulos
 
-        // Label background
-        const labelBg = new Konva.Rect({
-            x: midX - 55,
-            y: labelY,
-            width: 110,
-            height: labelHeight,
-            fill: 'white',
-            stroke: connection.hasInverse ? '#9b59b6' : '#ccc',
-            strokeWidth: connection.hasInverse ? 2 : 1,
-            cornerRadius: 4,
-            listening: false  // No necesita escuchar eventos
-        });
-        group.add(labelBg);
-
-        // Label text - restricción directa
-        const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
-        const labelText = new Konva.Text({
-            x: midX - 53,
-            y: labelY + 4,
-            width: 106,
-            text: `[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`,
-            fontSize: 11,
-            fontFamily: 'Arial',
-            fill: '#333',
-            align: 'center',
-            listening: false  // No necesita escuchar eventos
-        });
-        group.add(labelText);
-
-        // Label text - restricción inversa
-        let inverseLabelText = null;
         if (connection.hasInverse) {
+            // Dos rectángulos separados cuando hay inversa
+            const rectHeight = labelHeight + labelGap + labelHeight;
+            const labelY = midY - rectHeight / 2;
+
+            // RECTÁNGULO 1: Restricción directa (arriba)
+            const labelBg1 = new Konva.Rect({
+                x: midX - 60,
+                y: labelY,
+                width: 120,
+                height: labelHeight,
+                fill: 'white',
+                stroke: '#3498db',
+                strokeWidth: 2,
+                cornerRadius: 4,
+                listening: false
+            });
+            group.add(labelBg1);
+
+            // Texto de restricción directa
+            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+            const labelText = new Konva.Text({
+                x: midX - 58,
+                y: labelY + 4,
+                width: 116,
+                text: `[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`,
+                fontSize: 11,
+                fontFamily: 'Arial',
+                fill: '#333',
+                align: 'center',
+                listening: false
+            });
+            group.add(labelText);
+
+            // RECTÁNGULO 2: Restricción inversa (abajo)
+            const labelBg2 = new Konva.Rect({
+                x: midX - 60,
+                y: labelY + labelHeight + labelGap,
+                width: 120,
+                height: labelHeight,
+                fill: 'white',
+                stroke: '#9b59b6',
+                strokeWidth: 2,
+                cornerRadius: 4,
+                listening: false
+            });
+            group.add(labelBg2);
+
+            // Texto de restricción inversa
             const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
-            inverseLabelText = new Konva.Text({
-                x: midX - 53,
-                y: labelY + 20,
-                width: 106,
+            const inverseLabelText = new Konva.Text({
+                x: midX - 58,
+                y: labelY + labelHeight + labelGap + 4,
+                width: 116,
                 text: `⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`,
                 fontSize: 10,
                 fontFamily: 'Arial',
-                fill: '#e67e22',
+                fill: '#9b59b6',
                 align: 'center',
                 fontStyle: 'italic',
-                listening: false  // No necesita escuchar eventos
+                fontWeight: 'bold',
+                listening: false
             });
             group.add(inverseLabelText);
+
+            // Store references
+            group.labelBg = labelBg1;
+            group.labelBg2 = labelBg2;
+            group.labelText = labelText;
+            group.inverseLabelText = inverseLabelText;
+
+        } else {
+            // Un solo rectángulo cuando no hay inversa
+            const labelY = midY - labelHeight / 2;
+
+            // Rectángulo de fondo
+            const labelBg = new Konva.Rect({
+                x: midX - 60,
+                y: labelY,
+                width: 120,
+                height: labelHeight,
+                fill: 'white',
+                stroke: '#ccc',
+                strokeWidth: 1,
+                cornerRadius: 4,
+                listening: false
+            });
+            group.add(labelBg);
+
+            // Texto de restricción directa
+            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+            const labelText = new Konva.Text({
+                x: midX - 58,
+                y: labelY + 4,
+                width: 116,
+                text: `[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`,
+                fontSize: 11,
+                fontFamily: 'Arial',
+                fill: '#333',
+                align: 'center',
+                listening: false
+            });
+            group.add(labelText);
+
+            // Store references
+            group.labelBg = labelBg;
+            group.labelBg2 = null;
+            group.labelText = labelText;
+            group.inverseLabelText = null;
         }
 
         // Store references
         group.connectionData = connection;
         group.arrowNode = arrow;
-        group.labelBg = labelBg;
-        group.labelText = labelText;
-        group.inverseLabelText = inverseLabelText;
 
         // Event handlers
         this.setupConnectionGraphicHandlers(group, connection);
@@ -993,32 +1058,106 @@ class VNetCanvas {
                 return;
             }
 
-            // ✅ ARREGLO CRÍTICO: Solo actualizar el TEXTO del label, NO recrear el grupo
-            // Esto evita conflictos cuando se arrastra después
-            
-            // Actualizar label de restricción directa
-            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
-            group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
-            
-            // Actualizar label inverso si existe
-            if (connection.hasInverse && group.inverseLabelText) {
-                const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
-                group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
-            }
+            const labelHeight = 24;
+            const labelGap = 4;
 
-            // Actualizar color del rectángulo de fondo según hasInverse
             if (connection.hasInverse) {
-                group.labelBg.stroke('#9b59b6');
-                group.labelBg.strokeWidth(2);
+                // Necesitamos dos rectángulos
+                // Actualizar o crear rectángulo 1 (directo)
+                if (group.labelBg) {
+                    group.labelBg.stroke('#3498db');
+                    group.labelBg.strokeWidth(2);
+                }
+
+                // Crear o actualizar rectángulo 2 (inverso) si no existe
+                if (!group.labelBg2) {
+                    const labelBg1 = group.labelBg;
+                    const y1 = labelBg1.y();
+                    const x = labelBg1.x();
+
+                    const labelBg2 = new Konva.Rect({
+                        x: x,
+                        y: y1 + labelHeight + labelGap,
+                        width: 120,
+                        height: labelHeight,
+                        fill: 'white',
+                        stroke: '#9b59b6',
+                        strokeWidth: 2,
+                        cornerRadius: 4,
+                        listening: false
+                    });
+                    group.add(labelBg2);
+                    group.labelBg2 = labelBg2;
+                }
+
+                // Actualizar color del rectángulo 2
+                if (group.labelBg2) {
+                    group.labelBg2.stroke('#9b59b6');
+                    group.labelBg2.strokeWidth(2);
+                }
+
+                // Actualizar texto directo
+                const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+                group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+                group.labelText.fill('#333');
+
+                // Crear o actualizar texto inverso
+                if (!group.inverseLabelText) {
+                    const labelBg1 = group.labelBg;
+                    const y1 = labelBg1.y();
+                    const x = labelBg1.x();
+
+                    const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
+                    const inverseLabelText = new Konva.Text({
+                        x: x + 2,
+                        y: y1 + labelHeight + labelGap + 4,
+                        width: 116,
+                        text: `⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`,
+                        fontSize: 10,
+                        fontFamily: 'Arial',
+                        fill: '#9b59b6',
+                        align: 'center',
+                        fontStyle: 'italic',
+                        fontWeight: 'bold',
+                        listening: false
+                    });
+                    group.add(inverseLabelText);
+                    group.inverseLabelText = inverseLabelText;
+                } else {
+                    // Solo actualizar el texto
+                    const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
+                    group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
+                    group.inverseLabelText.fill('#9b59b6');
+                }
             } else {
-                group.labelBg.stroke('#ccc');
-                group.labelBg.strokeWidth(1);
+                // No hay inversa, solo un rectángulo
+                if (group.labelBg) {
+                    group.labelBg.stroke('#ccc');
+                    group.labelBg.strokeWidth(1);
+                }
+
+                // Remover rectángulo 2 si existe
+                if (group.labelBg2) {
+                    group.labelBg2.destroy();
+                    group.labelBg2 = null;
+                }
+
+                // Remover texto inverso si existe
+                if (group.inverseLabelText) {
+                    group.inverseLabelText.destroy();
+                    group.inverseLabelText = null;
+                }
+
+                // Actualizar texto directo
+                const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+                group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+                group.labelText.fill('#333');
             }
 
             // Redibujar la capa
             this.connectionsLayer.batchDraw();
             
-            console.log(`✅ Conexión actualizada correctamente (sin recrear grupo)`);
+            console.log(`✅ Conexión actualizada correctamente`);
         } catch (error) {
             console.error('❌ ERROR al actualizar conexión:', error);
             console.error('Stack:', error.stack);
@@ -1049,27 +1188,48 @@ class VNetCanvas {
         // Calcular posición del label
         const midX = (startX + endX) / 2;
         const midY = (startY + endY) / 2;
-        const labelHeight = connection.hasInverse ? 38 : 24;
-        const labelY = midY - labelHeight / 2;
+        const labelHeight = 24;
+        const labelGap = 4;
 
-        // Update label position
-        group.labelBg.x(midX - 55);
-        group.labelBg.y(labelY);
-        group.labelText.x(midX - 53);
-        group.labelText.y(labelY + 4);
+        if (connection.hasInverse) {
+            // Dos rectángulos separados
+            const rectHeight = labelHeight + labelGap + labelHeight;
+            const labelY = midY - rectHeight / 2;
 
-        // ✅ ARREGLO: Actualizar TEXTO del label con los valores actualizados
-        const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
-        group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+            // Actualizar rectángulo 1 (directo)
+            group.labelBg.x(midX - 60);
+            group.labelBg.y(labelY);
 
-        // Update inverse label if exists
-        if (group.inverseLabelText) {
-            group.inverseLabelText.x(midX - 53);
-            group.inverseLabelText.y(labelY + 20);
-            
-            // ✅ ARREGLO: Actualizar TEXTO del label inverso también
-            const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
-            group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
+            // Actualizar rectángulo 2 (inverso)
+            if (group.labelBg2) {
+                group.labelBg2.x(midX - 60);
+                group.labelBg2.y(labelY + labelHeight + labelGap);
+            }
+
+            // Actualizar texto directo
+            group.labelText.x(midX - 58);
+            group.labelText.y(labelY + 4);
+            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+            group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
+
+            // Actualizar texto inverso
+            if (group.inverseLabelText) {
+                group.inverseLabelText.x(midX - 58);
+                group.inverseLabelText.y(labelY + labelHeight + labelGap + 4);
+                const invMaxTimeStr = connection.inverseMaxTime === Infinity ? '∞' : connection.inverseMaxTime.toFixed(1);
+                group.inverseLabelText.text(`⟲ [${connection.inverseMinTime.toFixed(1)}, ${invMaxTimeStr}]`);
+            }
+        } else {
+            // Un solo rectángulo
+            const labelY = midY - labelHeight / 2;
+
+            group.labelBg.x(midX - 60);
+            group.labelBg.y(labelY);
+
+            group.labelText.x(midX - 58);
+            group.labelText.y(labelY + 4);
+            const maxTimeStr = connection.maxTime === Infinity ? '∞' : connection.maxTime.toFixed(1);
+            group.labelText.text(`[${connection.minTime.toFixed(1)}, ${maxTimeStr}]`);
         }
     }
 

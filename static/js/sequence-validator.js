@@ -1,10 +1,460 @@
 /**
  * V-Nets Web Editor - Validador de Secuencias
- * Valida secuencias manuales contra el modelo V-Net
+ * Implementación basada en el paper de V-nets
+ * 
+ * Incluye:
+ * - Algoritmo de Reconocimiento (Recognition Algorithm)
+ * - Algoritmo de Diagnóstico de Fallos (Fault Diagnosis)
  */
 
+// =====================================================
+// TIPOS DE FALLOS (según el paper)
+// =====================================================
+const FaultType = {
+    EVENT_FAULT: 'EVENT_FAULT',       // Evento no existe o no es el esperado
+    TIME_FAULT: 'TIME_FAULT',         // Tiempo fuera de [min, max]
+    LOGIC_FAULT: 'LOGIC_FAULT',       // No se cumple el predicado R
+    TIMEOUT_FAULT: 'TIMEOUT_FAULT',   // Se excedió el tleval
+    FREQUENCY_FAULT: 'FREQUENCY_FAULT', // Frecuencia excedida
+    CAUSALITY_FAULT: 'CAUSALITY_FAULT'  // No existe conexión causal
+};
+
+// Subtipos para TIME_FAULT
+const TimeFaultSubtype = {
+    EARLY: 'EARLY',   // Evento llegó muy pronto (Δt < min)
+    LATE: 'LATE'      // Evento llegó muy tarde (Δt > max)
+};
+
+// =====================================================
+// CLASE DE DIAGNÓSTICO
+// =====================================================
+class FaultDiagnostic {
+    constructor(type, eventIndex, eventName, details = {}) {
+        this.type = type;
+        this.eventIndex = eventIndex;
+        this.eventName = eventName;
+        this.timestamp = new Date().toISOString();
+        this.details = details;
+    }
+
+    toString() {
+        switch (this.type) {
+            case FaultType.EVENT_FAULT:
+                return `[EVENT_FAULT] Evento '${this.eventName}' en posición ${this.eventIndex}: ${this.details.message}`;
+            case FaultType.TIME_FAULT:
+                const subtype = this.details.subtype === TimeFaultSubtype.EARLY ? 'PRECOCIDAD' : 'RETRASO';
+                return `[TIME_FAULT:${subtype}] Evento '${this.eventName}' en posición ${this.eventIndex}: Δt=${this.details.actualDelta.toFixed(3)}, esperado=[${this.details.expectedMin}, ${this.details.expectedMax}]`;
+            case FaultType.CAUSALITY_FAULT:
+                return `[CAUSALITY_FAULT] No existe conexión ${this.details.fromEvent} → ${this.eventName} en la V-net`;
+            case FaultType.LOGIC_FAULT:
+                return `[LOGIC_FAULT] Predicado R no cumplido para '${this.eventName}': ${this.details.predicate}`;
+            case FaultType.TIMEOUT_FAULT:
+                return `[TIMEOUT_FAULT] Tiempo global ${this.details.currentTime} excede tleval=${this.details.tleval}`;
+            case FaultType.FREQUENCY_FAULT:
+                return `[FREQUENCY_FAULT] Evento '${this.eventName}' excede frecuencia máxima: ${this.details.actual}/${this.details.max}`;
+            default:
+                return `[UNKNOWN_FAULT] ${this.eventName}: ${JSON.stringify(this.details)}`;
+        }
+    }
+
+    toJSON() {
+        return {
+            type: this.type,
+            eventIndex: this.eventIndex,
+            eventName: this.eventName,
+            timestamp: this.timestamp,
+            details: this.details
+        };
+    }
+}
+
+// =====================================================
+// ESTADO DEL RECONOCEDOR
+// =====================================================
+class RecognitionState {
+    constructor(vnet) {
+        this.vnet = vnet;
+        this.currentEvents = [];      // Eventos procesados
+        this.currentLevel = 0;        // Nivel actual en la V-net
+        this.eventCounts = {};        // Contador de frecuencias por evento
+        this.lastTimestamp = 0;       // Último timestamp procesado
+        this.activeNodes = new Set(); // Nodos activos (posibles siguientes)
+        
+        // Inicializar contadores de frecuencia
+        Object.values(vnet.events).forEach(e => {
+            this.eventCounts[e.name] = 0;
+        });
+        
+        // Inicializar nodos activos con eventos INIT
+        Object.values(vnet.events)
+            .filter(e => e.eventType === 'init')
+            .forEach(e => this.activeNodes.add(e.name));
+    }
+
+    // Obtener eventos esperados según el estado actual
+    getExpectedEvents() {
+        return Array.from(this.activeNodes);
+    }
+
+    // Actualizar estado después de procesar un evento
+    advance(eventName, timestamp) {
+        this.currentEvents.push({ name: eventName, time: timestamp });
+        this.eventCounts[eventName] = (this.eventCounts[eventName] || 0) + 1;
+        this.lastTimestamp = timestamp;
+        
+        // Actualizar nodos activos: los que pueden seguir desde el evento actual
+        const event = Object.values(this.vnet.events).find(e => e.name === eventName);
+        if (event && event.outgoing) {
+            this.activeNodes.clear();
+            event.outgoing.forEach(conn => {
+                this.activeNodes.add(conn.target.name);
+            });
+        }
+        
+        this.currentLevel++;
+    }
+}
+
+// =====================================================
+// ALGORITMO DE RECONOCIMIENTO (Recognition Algorithm)
+// Basado en el paper de V-nets
+// =====================================================
+const RecognitionAlgorithm = {
+    /**
+     * Reconocer una secuencia de eventos contra una V-net
+     * 
+     * @param {Array} secuenciaInput - Lista de tuplas [evento, timestamp]
+     *                                  Ej: [["B", 0], ["RPIi", 0.5], ["RPIf", 6], ...]
+     * @param {Object} vnet - El modelo V-net a validar
+     * @param {Object} options - Opciones adicionales
+     *        - tleval: tiempo máximo global (default: Infinity)
+     *        - strictMode: validación estricta (default: true)
+     * @returns {Object} Resultado del reconocimiento
+     */
+    reconocerSecuencia(secuenciaInput, vnet, options = {}) {
+        const tleval = options.tleval || Infinity;
+        const strictMode = options.strictMode !== false;
+        
+        console.log('🔍 === ALGORITMO DE RECONOCIMIENTO ===');
+        console.log(`   Secuencia de entrada: ${secuenciaInput.length} eventos`);
+        console.log(`   tleval: ${tleval === Infinity ? '∞' : tleval}`);
+        
+        // Resultado del reconocimiento
+        const result = {
+            status: 'PROCESSING',
+            recognized: false,
+            conformity: 0,
+            processedEvents: 0,
+            totalEvents: secuenciaInput.length,
+            diagnostics: [],
+            timeline: [],
+            summary: {}
+        };
+
+        // Validar entrada
+        if (!secuenciaInput || secuenciaInput.length === 0) {
+            result.status = 'FAULT_DETECTED';
+            result.diagnostics.push(new FaultDiagnostic(
+                FaultType.EVENT_FAULT, 0, 'N/A',
+                { message: 'Secuencia vacía' }
+            ));
+            return this._finalizeResult(result, vnet);
+        }
+
+        // Crear estructuras de lookup
+        const eventByName = {};
+        Object.values(vnet.events).forEach(e => { eventByName[e.name] = e; });
+        
+        const connections = Object.values(vnet.connections);
+        
+        // Estado del reconocedor
+        const state = new RecognitionState(vnet);
+        
+        // Procesar cada evento de la secuencia
+        for (let i = 0; i < secuenciaInput.length; i++) {
+            const [eventName, timestamp] = secuenciaInput[i];
+            
+            console.log(`   [${i}] Procesando: ${eventName} @ t=${timestamp}`);
+            
+            // VALIDACIÓN 1: Existencia del evento en E
+            if (!eventByName[eventName]) {
+                result.diagnostics.push(new FaultDiagnostic(
+                    FaultType.EVENT_FAULT, i, eventName,
+                    { message: `Evento '${eventName}' no pertenece al conjunto E de la V-net` }
+                ));
+                if (strictMode) {
+                    result.status = 'FAULT_DETECTED';
+                    return this._finalizeResult(result, vnet, state);
+                }
+                continue;
+            }
+            
+            // VALIDACIÓN 2: Validación Global (timestamp <= tleval)
+            if (timestamp > tleval) {
+                result.diagnostics.push(new FaultDiagnostic(
+                    FaultType.TIMEOUT_FAULT, i, eventName,
+                    { currentTime: timestamp, tleval: tleval }
+                ));
+                result.status = 'FAULT_DETECTED';
+                return this._finalizeResult(result, vnet, state);
+            }
+            
+            // VALIDACIÓN 3: Causalidad (existe arco desde evento anterior)
+            if (i > 0) {
+                const prevEventName = secuenciaInput[i - 1][0];
+                const prevTimestamp = secuenciaInput[i - 1][1];
+                
+                // Buscar conexión directa
+                const connection = connections.find(c =>
+                    c.source.name === prevEventName && c.target.name === eventName
+                );
+                
+                if (!connection) {
+                    result.diagnostics.push(new FaultDiagnostic(
+                        FaultType.CAUSALITY_FAULT, i, eventName,
+                        { 
+                            fromEvent: prevEventName,
+                            expectedTargets: this._getOutgoingEvents(eventByName[prevEventName])
+                        }
+                    ));
+                    if (strictMode) {
+                        result.status = 'FAULT_DETECTED';
+                        return this._finalizeResult(result, vnet, state);
+                    }
+                    continue;
+                }
+                
+                // VALIDACIÓN 4: Restricción Temporal (Δt ∈ [min, max])
+                const deltaT = timestamp - prevTimestamp;
+                const minTime = connection.minTime;
+                const maxTime = connection.maxTime === Infinity ? Infinity : connection.maxTime;
+                
+                if (deltaT < minTime) {
+                    result.diagnostics.push(new FaultDiagnostic(
+                        FaultType.TIME_FAULT, i, eventName,
+                        {
+                            subtype: TimeFaultSubtype.EARLY,
+                            actualDelta: deltaT,
+                            expectedMin: minTime,
+                            expectedMax: maxTime === Infinity ? '∞' : maxTime,
+                            message: `Evento llegó muy PRONTO: Δt=${deltaT.toFixed(3)} < min=${minTime}`
+                        }
+                    ));
+                    if (strictMode) {
+                        result.status = 'FAULT_DETECTED';
+                        return this._finalizeResult(result, vnet, state);
+                    }
+                } else if (maxTime !== Infinity && deltaT > maxTime) {
+                    result.diagnostics.push(new FaultDiagnostic(
+                        FaultType.TIME_FAULT, i, eventName,
+                        {
+                            subtype: TimeFaultSubtype.LATE,
+                            actualDelta: deltaT,
+                            expectedMin: minTime,
+                            expectedMax: maxTime,
+                            message: `Evento llegó muy TARDE: Δt=${deltaT.toFixed(3)} > max=${maxTime}`
+                        }
+                    ));
+                    if (strictMode) {
+                        result.status = 'FAULT_DETECTED';
+                        return this._finalizeResult(result, vnet, state);
+                    }
+                }
+                
+                // VALIDACIÓN 5: Restricción Inversa (si existe)
+                if (connection.hasInverse) {
+                    // Verificar si hay un evento anterior al previo que sea el actual
+                    // Esto es para validar B → A cuando existe A → B con inversa
+                    // Se implementa en validación de secuencias completas
+                }
+            }
+            
+            // VALIDACIÓN 6: Frecuencia máxima
+            const event = eventByName[eventName];
+            const currentCount = state.eventCounts[eventName] || 0;
+            const maxFreq = event.frequency || 1;
+            
+            // Nota: frequency en el modelo actual es mínimo requerido, 
+            // pero podemos agregar maxFrequency si es necesario
+            
+            // Agregar al timeline
+            result.timeline.push({
+                index: i,
+                event: eventName,
+                timestamp: timestamp,
+                status: 'OK'
+            });
+            
+            // Avanzar estado
+            state.advance(eventName, timestamp);
+            result.processedEvents++;
+        }
+        
+        // VALIDACIÓN 7: Verificar que empieza con INIT
+        const firstEvent = eventByName[secuenciaInput[0][0]];
+        if (firstEvent && firstEvent.eventType !== 'init') {
+            result.diagnostics.push(new FaultDiagnostic(
+                FaultType.LOGIC_FAULT, 0, secuenciaInput[0][0],
+                { 
+                    predicate: 'StartWithInit',
+                    message: `La secuencia debe comenzar con un evento INIT, no con '${secuenciaInput[0][0]}' (tipo: ${firstEvent.eventType})`
+                }
+            ));
+        }
+        
+        // VALIDACIÓN 8: Verificar que termina con END
+        const lastEvent = eventByName[secuenciaInput[secuenciaInput.length - 1][0]];
+        if (lastEvent && lastEvent.eventType !== 'end') {
+            result.diagnostics.push(new FaultDiagnostic(
+                FaultType.LOGIC_FAULT, secuenciaInput.length - 1, secuenciaInput[secuenciaInput.length - 1][0],
+                { 
+                    predicate: 'EndWithEnd',
+                    message: `La secuencia debe terminar con un evento END, no con '${secuenciaInput[secuenciaInput.length - 1][0]}' (tipo: ${lastEvent.eventType})`
+                }
+            ));
+        }
+        
+        // Finalizar resultado
+        return this._finalizeResult(result, vnet, state);
+    },
+    
+    /**
+     * Obtener eventos salientes de un nodo
+     */
+    _getOutgoingEvents(event) {
+        if (!event || !event.outgoing) return [];
+        return event.outgoing.map(conn => conn.target.name);
+    },
+    
+    /**
+     * Finalizar y calcular métricas del resultado
+     */
+    _finalizeResult(result, vnet, state = null) {
+        // Calcular conformidad
+        const faultCount = result.diagnostics.length;
+        const totalChecks = result.totalEvents * 4; // 4 validaciones por evento aproximadamente
+        
+        if (faultCount === 0) {
+            result.status = '100% RECOGNIZED';
+            result.recognized = true;
+            result.conformity = 100;
+        } else {
+            result.status = 'FAULT_DETECTED';
+            result.recognized = false;
+            result.conformity = Math.max(0, Math.round((1 - faultCount / Math.max(totalChecks, 1)) * 100));
+        }
+        
+        // Resumen
+        result.summary = {
+            totalEvents: result.totalEvents,
+            processedEvents: result.processedEvents,
+            faultsDetected: faultCount,
+            faultsByType: this._groupFaultsByType(result.diagnostics),
+            recognitionRate: result.conformity + '%'
+        };
+        
+        console.log(`   ✅ Resultado: ${result.status}`);
+        console.log(`   Conformidad: ${result.conformity}%`);
+        console.log(`   Fallos detectados: ${faultCount}`);
+        
+        return result;
+    },
+    
+    /**
+     * Agrupar fallos por tipo
+     */
+    _groupFaultsByType(diagnostics) {
+        const groups = {};
+        diagnostics.forEach(d => {
+            if (!groups[d.type]) groups[d.type] = [];
+            groups[d.type].push(d);
+        });
+        return groups;
+    }
+};
+
+// =====================================================
+// ALGORITMO DE DIAGNÓSTICO DE FALLOS
+// =====================================================
+const DiagnosticAlgorithm = {
+    /**
+     * Analizar fallos y generar reporte detallado
+     */
+    analyzeFaults(diagnostics) {
+        const report = {
+            totalFaults: diagnostics.length,
+            criticalFaults: 0,
+            warnings: 0,
+            byType: {},
+            recommendations: []
+        };
+        
+        diagnostics.forEach(fault => {
+            // Clasificar severidad
+            if (fault.type === FaultType.TIMEOUT_FAULT || 
+                fault.type === FaultType.CAUSALITY_FAULT) {
+                report.criticalFaults++;
+            } else {
+                report.warnings++;
+            }
+            
+            // Agrupar por tipo
+            if (!report.byType[fault.type]) {
+                report.byType[fault.type] = {
+                    count: 0,
+                    instances: []
+                };
+            }
+            report.byType[fault.type].count++;
+            report.byType[fault.type].instances.push(fault);
+        });
+        
+        // Generar recomendaciones
+        if (report.byType[FaultType.TIME_FAULT]) {
+            const timeFaults = report.byType[FaultType.TIME_FAULT].instances;
+            const earlyCount = timeFaults.filter(f => f.details.subtype === TimeFaultSubtype.EARLY).length;
+            const lateCount = timeFaults.filter(f => f.details.subtype === TimeFaultSubtype.LATE).length;
+            
+            if (earlyCount > lateCount) {
+                report.recommendations.push('Considerar aumentar los tiempos mínimos de las restricciones');
+            } else if (lateCount > earlyCount) {
+                report.recommendations.push('Considerar aumentar los tiempos máximos de las restricciones');
+            }
+        }
+        
+        if (report.byType[FaultType.CAUSALITY_FAULT]) {
+            report.recommendations.push('Verificar que existan todas las conexiones necesarias en la V-net');
+        }
+        
+        return report;
+    },
+    
+    /**
+     * Generar diagnóstico legible
+     */
+    generateReadableReport(diagnostics) {
+        if (diagnostics.length === 0) {
+            return '✅ No se detectaron fallos. Secuencia 100% reconocida.';
+        }
+        
+        let report = '❌ DIAGNÓSTICO DE FALLOS\n';
+        report += '═'.repeat(50) + '\n\n';
+        
+        diagnostics.forEach((fault, index) => {
+            report += `[${index + 1}] ${fault.toString()}\n\n`;
+        });
+        
+        return report;
+    }
+};
+
+// =====================================================
+// VALIDADOR DE SECUENCIAS (Wrapper para UI)
+// =====================================================
 const SequenceValidator = {
-    // Parsear secuencia desde texto
+    /**
+     * Parsear secuencia desde diferentes formatos de texto
+     */
     parseSequence(text, eventNames) {
         const normalized = text.trim();
         const events = [];
@@ -12,10 +462,24 @@ const SequenceValidator = {
         // Formato 1: EventName(time), EventName(time), ...
         // Formato 2: EventName, EventName, ...
         // Formato 3: EventName | time (por línea)
+        // Formato 4: [("EventName", time), ("EventName", time), ...]
 
-        // Detectar formato
+        // Detectar formato Python/tuplas
+        if (normalized.startsWith('[') && normalized.includes('(')) {
+            // Formato Python: [("B", 0), ("RPIi", 0.5), ...]
+            const regex = /\(\s*["']([^"']+)["']\s*,\s*([0-9.]+)\s*\)/g;
+            let match;
+            while ((match = regex.exec(normalized)) !== null) {
+                events.push({
+                    name: match[1],
+                    time: parseFloat(match[2])
+                });
+            }
+            return events;
+        }
+        
+        // Detectar formato tabla
         if (normalized.includes('|')) {
-            // Formato tabla
             const lines = normalized.split('\n').filter(l => l.trim());
             for (const line of lines) {
                 const parts = line.split('|').map(p => p.trim());
@@ -27,8 +491,11 @@ const SequenceValidator = {
                     }
                 }
             }
-        } else if (normalized.includes('(') && normalized.includes(')')) {
-            // Formato con timestamps
+            return events;
+        }
+        
+        // Detectar formato con timestamps: A(0), B(3), ...
+        if (normalized.includes('(') && normalized.includes(')')) {
             const regex = /([a-zA-Z0-9_]+)\s*\(\s*([0-9.]+)\s*\)/g;
             let match;
             while ((match = regex.exec(normalized)) !== null) {
@@ -37,34 +504,35 @@ const SequenceValidator = {
                     time: parseFloat(match[2])
                 });
             }
-        } else {
-            // Formato solo nombres
-            const separators = /[\s,\-\>→;]+/;
-            const names = normalized.split(separators)
-                .map(n => n.trim())
-                .filter(n => n && /^[a-zA-Z0-9_]+$/.test(n));
-            
-            console.log('   🔍 Parsing formato "solo nombres":');
-            console.log('      Input normalizado:', normalized);
-            console.log('      Nombres extraídos:', names);
-            
-            names.forEach(name => {
-                events.push({ name, time: null });
-            });
+            return events;
         }
-
+        
+        // Formato solo nombres
+        const separators = /[\s,\-\>→;]+/;
+        const names = normalized.split(separators)
+            .map(n => n.trim())
+            .filter(n => n && /^[a-zA-Z0-9_]+$/.test(n));
+        
+        console.log('   🔍 Parsing formato "solo nombres":');
+        console.log('      Input normalizado:', normalized);
+        console.log('      Nombres extraídos:', names);
+        
+        names.forEach(name => {
+            events.push({ name, time: null });
+        });
+        
         return events;
     },
 
-    // Asignar tiempos automáticamente si no están especificados
+    /**
+     * Asignar tiempos automáticamente si no están especificados
+     */
     assignAutoTimes(events, vnet) {
         if (events.length === 0) return events;
 
-        // Si ya tienen tiempos, solo verificar orden
         const allHaveTimes = events.every(e => e.time !== null);
         if (allHaveTimes) return events;
 
-        // Asignar tiempos mínimos basados en restricciones
         const result = [...events];
         result[0].time = 0;
 
@@ -72,7 +540,6 @@ const SequenceValidator = {
             const prevName = result[i - 1].name;
             const currName = result[i].name;
             
-            // Buscar conexión entre eventos
             const conn = Object.values(vnet.connections).find(c => 
                 c.source.name === prevName && c.target.name === currName
             );
@@ -80,7 +547,6 @@ const SequenceValidator = {
             if (conn) {
                 result[i].time = result[i - 1].time + conn.minTime;
             } else {
-                // Sin conexión, usar tiempo arbitrario
                 result[i].time = result[i - 1].time + 1;
             }
         }
@@ -88,265 +554,125 @@ const SequenceValidator = {
         return result;
     },
 
-    // Validar secuencia contra el modelo
-    validate(sequence, vnet) {
-        const results = {
-            valid: true,
-            conformity: 100,
+    /**
+     * Validar secuencia usando el Algoritmo de Reconocimiento
+     * Compatible con la UI existente
+     */
+    validate(sequence, vnet, options = {}) {
+        // Convertir formato UI a formato del algoritmo
+        const secuenciaInput = sequence.map(s => [s.name, s.time]);
+        
+        // Ejecutar algoritmo de reconocimiento
+        const recognitionResult = RecognitionAlgorithm.reconocerSecuencia(secuenciaInput, vnet, {
+            ...options,
+            strictMode: false  // Para UI, mostrar todos los errores
+        });
+        
+        // Convertir resultado al formato esperado por la UI
+        return this._convertToUIFormat(recognitionResult, sequence, vnet);
+    },
+    
+    /**
+     * Convertir resultado del algoritmo al formato de UI
+     */
+    _convertToUIFormat(recognitionResult, sequence, vnet) {
+        const result = {
+            valid: recognitionResult.recognized,
+            conformity: recognitionResult.conformity,
             checks: [],
             errors: [],
             warnings: [],
-            summary: {}
+            summary: {},
+            diagnostics: recognitionResult.diagnostics  // Incluir diagnósticos completos
         };
-
-        const events = Object.values(vnet.events);
-        const connections = Object.values(vnet.connections);
-        const eventByName = {};
-        events.forEach(e => { eventByName[e.name] = e; });
-
-        // 1. Verificar que la secuencia no esté vacía
-        if (sequence.length === 0) {
-            results.valid = false;
-            results.errors.push('La secuencia está vacía');
-            results.conformity = 0;
-            return results;
-        }
-
-        let totalChecks = 0;
-        let passedChecks = 0;
-
-        // 2. Verificar existencia de eventos
-        totalChecks++;
-        const unknownEvents = sequence.filter(s => !eventByName[s.name]);
-        if (unknownEvents.length > 0) {
-            results.valid = false;
-            results.errors.push(`Eventos no encontrados en el modelo: ${unknownEvents.map(e => e.name).join(', ')}`);
-            results.checks.push({ name: 'Existencia de eventos', passed: false });
+        
+        // Convertir diagnósticos a checks y errores
+        const faultsByType = recognitionResult.summary.faultsByType || {};
+        
+        // Check: Existencia de eventos
+        const eventFaults = faultsByType[FaultType.EVENT_FAULT] || [];
+        if (eventFaults.length === 0) {
+            result.checks.push({ name: 'Existencia de eventos', passed: true, detail: 'Todos los eventos existen en E' });
         } else {
-            passedChecks++;
-            results.checks.push({ name: 'Existencia de eventos', passed: true, detail: 'Todos los eventos existen en el modelo' });
+            result.checks.push({ name: 'Existencia de eventos', passed: false, detail: `${eventFaults.length} eventos no encontrados` });
+            eventFaults.forEach(f => result.errors.push(f.toString()));
         }
-
-        // 3. Verificar que empieza con INIT
-        totalChecks++;
-        const firstEvent = eventByName[sequence[0].name];
-        if (firstEvent && firstEvent.eventType !== 'init') {
-            results.errors.push(`La secuencia debe comenzar con un evento INIT, pero comienza con '${sequence[0].name}' (tipo: ${firstEvent.eventType})`);
-            results.checks.push({ name: 'Inicio con INIT', passed: false });
-        } else if (firstEvent) {
-            passedChecks++;
-            results.checks.push({ name: 'Inicio con INIT', passed: true, detail: `Comienza con '${sequence[0].name}'` });
+        
+        // Check: Causalidad
+        const causalityFaults = faultsByType[FaultType.CAUSALITY_FAULT] || [];
+        if (causalityFaults.length === 0 && sequence.length > 1) {
+            result.checks.push({ name: 'Causalidad (conexiones)', passed: true, detail: 'Todas las conexiones existen' });
+        } else if (causalityFaults.length > 0) {
+            result.checks.push({ name: 'Causalidad (conexiones)', passed: false, detail: `${causalityFaults.length} conexiones faltantes` });
+            causalityFaults.forEach(f => result.errors.push(f.toString()));
         }
-
-        // 4. Verificar que termina con END
-        totalChecks++;
-        const lastEvent = eventByName[sequence[sequence.length - 1].name];
-        if (lastEvent && lastEvent.eventType !== 'end') {
-            results.errors.push(`La secuencia debe terminar con un evento END, pero termina con '${sequence[sequence.length - 1].name}' (tipo: ${lastEvent.eventType})`);
-            results.checks.push({ name: 'Fin con END', passed: false });
-        } else if (lastEvent) {
-            passedChecks++;
-            results.checks.push({ name: 'Fin con END', passed: true, detail: `Termina con '${sequence[sequence.length - 1].name}'` });
-        }
-
-        // 5. Verificar conexiones entre eventos consecutivos (Algoritmo 2 del artículo)
-        const connectionErrors = [];
-        const temporalErrors = [];
-
-        for (let i = 0; i < sequence.length - 1; i++) {
-            const fromName = sequence[i].name;
-            const toName = sequence[i + 1].name;
-            const timeDiff = sequence[i + 1].time - sequence[i].time;
-
-            const conn = connections.find(c =>
-                c.source.name === fromName && c.target.name === toName
-            );
-
-            totalChecks++;
-            if (!conn) {
-                connectionErrors.push(`${fromName} → ${toName}`);
-            } else {
-                // Algoritmo 2: Verificar restricciones temporales (MatchWithVnet del artículo)
-                const Texpected = this.getTimeConstraint(conn);
-                const isWithinConstraint = this.checkTimeConstraint(timeDiff, Texpected);
-
-                if (!isWithinConstraint) {
-                    const maxTimeStr = Texpected.maxTime === Infinity ? '∞' : Texpected.maxTime.toFixed(2);
-                    temporalErrors.push(
-                        `${fromName} → ${toName}: tiempo=${timeDiff.toFixed(2)}, esperado=[${Texpected.minTime.toFixed(2)}, ${maxTimeStr}]`
-                    );
-                } else {
-                    passedChecks++;
-                }
-            }
-        }
-
-        // Reportar errores de conexiones
-        if (connectionErrors.length > 0) {
-            results.errors.push(`Conexiones no válidas: ${connectionErrors.join(', ')}`);
-            results.checks.push({
-                name: 'Conexiones válidas',
-                passed: false,
-                detail: `${connectionErrors.length} conexiones inválidas`
-            });
-        }
-
-        // Reportar errores temporales (Algoritmo 2)
-        if (temporalErrors.length > 0) {
-            results.errors.push(`Restricciones temporales violadas: ${temporalErrors.join('; ')}`);
-            results.checks.push({
-                name: 'Restricciones temporales (Algoritmo 2)',
-                passed: false,
-                detail: `${temporalErrors.length} violaciones temporales`
-            });
-        }
-
-        // Éxito si no hay errores de conexiones ni temporales
-        if (connectionErrors.length === 0 && temporalErrors.length === 0 && sequence.length > 1) {
-            results.checks.push({
-                name: 'Conexiones válidas',
-                passed: true,
-                detail: `${sequence.length - 1} conexiones verificadas`
-            });
-            results.checks.push({
-                name: 'Restricciones temporales (Algoritmo 2)',
-                passed: true,
-                detail: `${sequence.length - 1} restricciones temporales válidas`
-            });
-        }
-
-        // 6. Verificar restricciones temporales
-        const timeErrors = [];
-        for (let i = 0; i < sequence.length - 1; i++) {
-            const fromName = sequence[i].name;
-            const toName = sequence[i + 1].name;
-            const fromTime = sequence[i].time;
-            const toTime = sequence[i + 1].time;
-
-            const conn = connections.find(c => 
-                c.source.name === fromName && c.target.name === toName
-            );
-
-            if (conn && fromTime !== null && toTime !== null) {
-                totalChecks++;
-                const delta = toTime - fromTime;
-                const minTime = conn.minTime;
-                const maxTime = conn.maxTime === Infinity ? Infinity : conn.maxTime;
-
-                if (delta < minTime) {
-                    timeErrors.push(`${fromName}→${toName}: δ=${delta.toFixed(2)} < min=${minTime}`);
-                } else if (maxTime !== Infinity && delta > maxTime) {
-                    timeErrors.push(`${fromName}→${toName}: δ=${delta.toFixed(2)} > max=${maxTime}`);
-                } else {
-                    passedChecks++;
-                }
-            }
-        }
-
-        if (timeErrors.length > 0) {
-            results.errors.push(`Restricciones temporales violadas:\n  • ${timeErrors.join('\n  • ')}`);
-            results.checks.push({ 
+        
+        // Check: Restricciones temporales
+        const timeFaults = faultsByType[FaultType.TIME_FAULT] || [];
+        if (timeFaults.length === 0 && sequence.length > 1) {
+            result.checks.push({ name: 'Restricciones temporales', passed: true, detail: 'Δt ∈ [min, max] para todas las transiciones' });
+        } else if (timeFaults.length > 0) {
+            const earlyCount = timeFaults.filter(f => f.details.subtype === TimeFaultSubtype.EARLY).length;
+            const lateCount = timeFaults.filter(f => f.details.subtype === TimeFaultSubtype.LATE).length;
+            result.checks.push({ 
                 name: 'Restricciones temporales', 
                 passed: false, 
-                detail: `${timeErrors.length} violaciones` 
+                detail: `${earlyCount} precoces, ${lateCount} tardíos` 
             });
-        } else if (sequence.length > 1) {
-            results.checks.push({ 
-                name: 'Restricciones temporales', 
-                passed: true, 
-                detail: 'Todos los intervalos cumplen' 
-            });
+            timeFaults.forEach(f => result.errors.push(f.toString()));
         }
-
-        // 7. Verificar frecuencias
+        
+        // Check: Validación global (tleval)
+        const timeoutFaults = faultsByType[FaultType.TIMEOUT_FAULT] || [];
+        if (timeoutFaults.length === 0) {
+            result.checks.push({ name: 'Validación global (tleval)', passed: true, detail: 'Dentro del tiempo límite' });
+        } else {
+            result.checks.push({ name: 'Validación global (tleval)', passed: false, detail: 'Excedió tiempo límite' });
+            timeoutFaults.forEach(f => result.errors.push(f.toString()));
+        }
+        
+        // Check: Predicados lógicos
+        const logicFaults = faultsByType[FaultType.LOGIC_FAULT] || [];
+        if (logicFaults.length === 0) {
+            result.checks.push({ name: 'Predicados lógicos', passed: true, detail: 'Init→...→End válido' });
+        } else {
+            result.checks.push({ name: 'Predicados lógicos', passed: false, detail: `${logicFaults.length} predicados fallidos` });
+            logicFaults.forEach(f => result.errors.push(f.toString()));
+        }
+        
+        // Resumen
+        const events = Object.values(vnet.events);
         const eventCounts = {};
         sequence.forEach(s => {
             eventCounts[s.name] = (eventCounts[s.name] || 0) + 1;
         });
-
-        const frequencyErrors = [];
-        for (const event of events) {
-            const count = eventCounts[event.name] || 0;
-            if (count < event.frequency) {
-                totalChecks++;
-                frequencyErrors.push(`'${event.name}': aparece ${count} veces, requiere ${event.frequency}`);
-            } else if (count > 0 || event.frequency > 0) {
-                totalChecks++;
-                passedChecks++;
-            }
-        }
-
-        if (frequencyErrors.length > 0) {
-            results.warnings.push(`Frecuencias insuficientes:\n  • ${frequencyErrors.join('\n  • ')}`);
-            results.checks.push({ 
-                name: 'Frecuencias de eventos', 
-                passed: false, 
-                detail: `${frequencyErrors.length} eventos con frecuencia insuficiente` 
-            });
-        } else {
-            results.checks.push({ 
-                name: 'Frecuencias de eventos', 
-                passed: true, 
-                detail: 'Todas las frecuencias cumplidas' 
-            });
-        }
-
-        // 8. Verificar orden temporal
-        totalChecks++;
-        let temporalOrderOk = true;
-        for (let i = 1; i < sequence.length; i++) {
-            if (sequence[i].time !== null && sequence[i - 1].time !== null) {
-                if (sequence[i].time < sequence[i - 1].time) {
-                    temporalOrderOk = false;
-                    results.errors.push(`Orden temporal violado: t(${sequence[i].name})=${sequence[i].time} < t(${sequence[i - 1].name})=${sequence[i - 1].time}`);
-                    break;
-                }
-            }
-        }
-
-        if (temporalOrderOk) {
-            passedChecks++;
-            results.checks.push({ name: 'Orden temporal', passed: true, detail: 'Los tiempos están ordenados' });
-        } else {
-            results.checks.push({ name: 'Orden temporal', passed: false });
-        }
-
-        // Calcular conformidad
-        results.conformity = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
-        results.valid = results.errors.length === 0;
-
-        // Resumen
-        results.summary = {
+        
+        result.summary = {
             totalEvents: sequence.length,
             uniqueEvents: Object.keys(eventCounts).length,
-            totalTime: sequence[sequence.length - 1].time - sequence[0].time,
-            passedChecks,
-            totalChecks
+            totalTime: sequence.length > 0 ? sequence[sequence.length - 1].time - sequence[0].time : 0,
+            passedChecks: result.checks.filter(c => c.passed).length,
+            totalChecks: result.checks.length,
+            status: recognitionResult.status
         };
-
-        return results;
+        
+        return result;
     },
-
-    // Algoritmo 2 del artículo: Obtener restricción temporal entre eventos
-    getTimeConstraint(connection) {
-        return {
-            minTime: connection.minTime,
-            maxTime: connection.maxTime
-        };
-    },
-
-    // Algoritmo 2 del artículo: Verificar si el tiempo está dentro de la restricción
-    checkTimeConstraint(actualTimeDiff, expectedConstraint) {
-        // Según el artículo: if (ti+1 - ti) is not within Texpected then return False
-        const { minTime, maxTime } = expectedConstraint;
-        return actualTimeDiff >= minTime && (maxTime === Infinity || actualTimeDiff <= maxTime);
+    
+    /**
+     * Método directo para usar formato de tuplas
+     * Ej: reconocerSecuencia([["B", 0], ["RPIi", 0.5], ["RPIf", 6]], vnet)
+     */
+    reconocerSecuencia(secuenciaInput, vnet, options = {}) {
+        return RecognitionAlgorithm.reconocerSecuencia(secuenciaInput, vnet, options);
     }
 };
 
-// Diálogo de validación de secuencias
+// =====================================================
+// DIÁLOGO DE VALIDACIÓN (UI)
+// =====================================================
 const SequenceValidatorDialog = {
     show(vnet) {
-        // Obtener nombres de eventos para autocompletado
         const eventNames = Object.values(vnet.events).map(e => e.name);
 
         console.log('🔍 SequenceValidatorDialog.show() iniciado');
@@ -363,7 +689,15 @@ const SequenceValidatorDialog = {
                         <div class="form-group">
                             <label for="sequenceInput">Ingrese la secuencia a validar:</label>
                             <textarea id="sequenceInput" class="form-control sequence-input" rows="5" 
-                                placeholder="Formatos aceptados:&#10;&#10;1. Con tiempos: A(0), B(3), D(10)&#10;2. Sin tiempos: A, B, D&#10;3. Con flechas: A → B → D&#10;4. Tabla (una por línea):&#10;   A | 0&#10;   B | 3&#10;   D | 10"></textarea>
+                                placeholder="Formatos aceptados:&#10;&#10;1. Con tiempos: A(0), B(3), D(10)&#10;2. Sin tiempos: A, B, D&#10;3. Formato Python: [(&quot;B&quot;, 0), (&quot;RPIi&quot;, 0.5), ...]&#10;4. Tabla:&#10;   A | 0&#10;   B | 3"></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="tlevalInput">tleval (tiempo máximo global):</label>
+                                <input type="number" id="tlevalInput" class="form-control" value="59" step="0.1" min="0">
+                                <span class="help-text">Dejar vacío o 0 para sin límite</span>
+                            </div>
                         </div>
 
                         <div class="events-hint">
@@ -387,6 +721,11 @@ const SequenceValidatorDialog = {
         document.getElementById('vnet-modal-container').innerHTML = html;
         this._vnet = vnet;
         
+        // 🔐 Marcar modal como abierto para prevenir eliminación accidental
+        if (window.VNetDialogs) {
+            window.VNetDialogs.isModalOpen = true;
+        }
+        
         console.log('   ✅ Modal creado e inyectado en el DOM');
     },
 
@@ -405,10 +744,14 @@ const SequenceValidatorDialog = {
 
     validate() {
         const input = document.getElementById('sequenceInput').value;
+        const tlevalInput = document.getElementById('tlevalInput').value;
+        const tleval = tlevalInput && parseFloat(tlevalInput) > 0 ? parseFloat(tlevalInput) : Infinity;
+        
         const eventNames = Object.values(this._vnet.events).map(e => e.name);
 
         console.log('🔍 SequenceValidator.validate() iniciado');
         console.log('   Input:', input);
+        console.log('   tleval:', tleval);
         console.log('   Eventos disponibles:', eventNames);
 
         // Parsear secuencia
@@ -430,14 +773,12 @@ const SequenceValidatorDialog = {
         }
 
         console.log('   Asignando tiempos automáticos...');
-        // Asignar tiempos automáticos si es necesario
         sequence = SequenceValidator.assignAutoTimes(sequence, this._vnet);
         
         console.log('   Secuencia con tiempos:', sequence);
 
-        console.log('   Validando contra vnet...');
-        // Validar
-        const result = SequenceValidator.validate(sequence, this._vnet);
+        console.log('   Validando con Algoritmo de Reconocimiento...');
+        const result = SequenceValidator.validate(sequence, this._vnet, { tleval });
 
         console.log('   Resultado de validación:', result);
         this.showResults(result, sequence);
@@ -445,12 +786,13 @@ const SequenceValidatorDialog = {
 
     showResults(result, sequence) {
         const conformityClass = result.conformity >= 80 ? 'high' : (result.conformity >= 50 ? 'medium' : 'low');
+        const statusText = result.summary.status || (result.valid ? '100% RECOGNIZED' : 'FAULT_DETECTED');
 
         let html = `
             <div class="validation-result ${result.valid ? 'success' : 'error'}">
                 <div class="validation-header">
                     <div class="validation-status">
-                        ${result.valid ? 'Secuencia VÁLIDA' : 'Secuencia INVÁLIDA'}
+                        ${statusText}
                     </div>
                     <div class="conformity-meter ${conformityClass}">
                         <div class="conformity-fill" style="width: ${result.conformity}%"></div>
@@ -479,7 +821,25 @@ const SequenceValidatorDialog = {
                 </div>
         `;
 
-        if (result.errors.length > 0) {
+        // Diagnósticos detallados
+        if (result.diagnostics && result.diagnostics.length > 0) {
+            html += `
+                <div class="validation-errors">
+                    <h5>🔍 Diagnóstico de Fallos:</h5>
+                    <div class="diagnostics-list">
+                        ${result.diagnostics.map((d, i) => `
+                            <div class="diagnostic-item ${d.type.toLowerCase().replace('_', '-')}">
+                                <span class="diagnostic-type">[${d.type}]</span>
+                                <span class="diagnostic-event">Evento ${d.eventIndex}: '${d.eventName}'</span>
+                                <span class="diagnostic-detail">${d.details.message || JSON.stringify(d.details)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (result.errors.length > 0 && (!result.diagnostics || result.diagnostics.length === 0)) {
             html += `
                 <div class="validation-errors">
                     <h5>Errores encontrados:</h5>
@@ -530,7 +890,13 @@ const SequenceValidatorDialog = {
     }
 };
 
-// Exportar
+// =====================================================
+// EXPORTAR
+// =====================================================
+window.FaultType = FaultType;
+window.TimeFaultSubtype = TimeFaultSubtype;
+window.FaultDiagnostic = FaultDiagnostic;
+window.RecognitionAlgorithm = RecognitionAlgorithm;
+window.DiagnosticAlgorithm = DiagnosticAlgorithm;
 window.SequenceValidator = SequenceValidator;
 window.SequenceValidatorDialog = SequenceValidatorDialog;
-

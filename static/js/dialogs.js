@@ -6,6 +6,9 @@
 const VNetDialogs = {
     // Currently open context menu
     currentContextMenu: null,
+    
+    // Track if a modal is currently open
+    isModalOpen: false,
 
     init() {
         // Close context menu on click outside
@@ -59,6 +62,9 @@ const VNetDialogs = {
         // Store callback
         this._eventSaveCallback = onSave;
         this._currentEvent = event;
+
+        // 🔐 Marcar modal como abierto para prevenir eliminación accidental
+        this.isModalOpen = true;
 
         // Focus on name input
         setTimeout(() => document.getElementById('eventName').focus(), 100);
@@ -227,6 +233,9 @@ const VNetDialogs = {
 
         this._connectionSaveCallback = onSave;
         this._currentConnection = connection;
+        
+        // 🔐 Marcar modal como abierto para prevenir eliminación accidental
+        this.isModalOpen = true;
     },
 
     switchRestrictionTab(tab) {
@@ -430,6 +439,9 @@ const VNetDialogs = {
         if (modal) {
             modal.remove();
         }
+        
+        // 🔐 Marcar modal como cerrado
+        this.isModalOpen = false;
         
         // ✅ ARREGLO: Solo desseleccionar para eventModal, NO para connectionModal
         // El connectionModal no necesita desseleccionar porque solo se editan restricciones
