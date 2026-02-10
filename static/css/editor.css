@@ -1700,3 +1700,264 @@
         flex-direction: column;
     }
 }
+
+/* =====================================================
+   ESTILOS MINIMALISTAS - VISTA SECUENCIAS
+   ===================================================== */
+
+/* Filtros - Diseño Limpio */
+.sequences-filter {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 20px 0;
+}
+
+.sequences-filter input,
+.sequences-filter select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    font-size: 0.85em;
+    background: white;
+    transition: border 0.2s;
+}
+
+.sequences-filter input:focus,
+.sequences-filter select:focus {
+    outline: none;
+    border-color: #666;
+}
+
+/* Toggle Minimalista */
+.view-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    justify-content: flex-start;
+}
+
+.toggle-btn {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #666;
+    border-radius: 2px;
+    cursor: pointer;
+    font-weight: 400;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    background: #f5f5f5;
+    border-color: #999;
+}
+
+.toggle-btn.active {
+    background: #333;
+    color: white;
+    border-color: #333;
+}
+
+.sequences-view {
+    display: none;
+}
+
+.sequences-view.active {
+    display: block;
+}
+
+/* Tarjetas Minimalistas */
+.sequences-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sequence-detail-card {
+    border: 1px solid #e8e8e8;
+    border-radius: 2px;
+    background: white;
+    transition: border 0.2s;
+}
+
+.sequence-detail-card:hover {
+    border-color: #999;
+}
+
+.sequence-header {
+    padding: 10px 12px;
+    background: #fafafa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    border-bottom: 1px solid #eee;
+}
+
+.sequence-header:hover {
+    background: #f5f5f5;
+}
+
+.sequence-id {
+    min-width: 80px;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9em;
+}
+
+.sequence-summary {
+    flex: 1;
+    font-size: 0.85em;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.expand-icon {
+    font-size: 0.7em;
+    color: #999;
+}
+
+.sequence-detail {
+    padding: 12px;
+}
+
+/* Línea de Tiempo Minimalista */
+.sequence-timeline {
+    margin-bottom: 12px;
+}
+
+.timeline-item {
+    display: flex;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.timeline-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 30px;
+    width: 1px;
+    height: calc(100% + 8px);
+    background: #e0e0e0;
+}
+
+.timeline-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    background: white;
+    border: 2px solid #333;
+    color: #333;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 0.75em;
+    z-index: 10;
+}
+
+.timeline-content {
+    flex: 1;
+    margin-left: 12px;
+    padding: 8px 0;
+}
+
+.timeline-content h4 {
+    margin: 0 0 4px 0;
+    color: #333;
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+.event-time,
+.event-delta {
+    margin: 2px 0;
+    font-size: 0.8em;
+    color: #666;
+}
+
+.event-time strong,
+.event-delta strong {
+    font-family: 'Courier New', monospace;
+    color: #333;
+    font-weight: 600;
+}
+
+/* Estadísticas Limpias */
+.sequence-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+}
+
+.stat-mini {
+    background: #fafafa;
+    padding: 8px 10px;
+    border-radius: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #f0f0f0;
+}
+
+.stat-mini .label {
+    font-size: 0.75em;
+    color: #666;
+    font-weight: 400;
+}
+
+.stat-mini .value {
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+/* Tabla Minimalista */
+.sequences-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 0.85em;
+}
+
+.sequences-table thead {
+    background: #fafafa;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.sequences-table th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.85em;
+}
+
+.sequences-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.15s;
+    cursor: pointer;
+}
+
+.sequences-table tbody tr:hover {
+    background: #fafafa;
+}
+
+.sequences-table td {
+    padding: 10px 12px;
+    color: #444;
+}
+
+.sequence-cell {
+    font-size: 0.9em;
+}

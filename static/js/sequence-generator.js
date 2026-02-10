@@ -559,66 +559,187 @@ const SequenceGeneratorDialog = {
         const avgLength = lengths.length > 0 ? (lengths.reduce((a, b) => a + b, 0) / lengths.length).toFixed(1) : 0;
         const minLength = lengths.length > 0 ? Math.min(...lengths) : 0;
         const maxLengthVal = lengths.length > 0 ? Math.max(...lengths) : 0;
+        const avgTime = times.length > 0 ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2) : 0;
 
         let html = `
-            <div class="results-stats">
-                <div class="stat-card">
-                    <span class="stat-value">${sequences.length}</span>
-                    <span class="stat-label">Secuencias generadas</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${(timeElapsed / 1000).toFixed(2)}s</span>
-                    <span class="stat-label">Tiempo de ejecución</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${algorithm}</span>
-                    <span class="stat-label">Algoritmo utilizado</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${avgLength}</span>
-                    <span class="stat-label">Longitud promedio</span>
-                </div>
+            <div class="results-stats" style="display: flex; gap: 12px; margin-bottom: 16px; font-size: 0.85em; color: #666;">
+                <span><strong>${sequences.length}</strong> secuencias</span>
+                <span>•</span>
+                <span>${(timeElapsed / 1000).toFixed(2)}s</span>
+                <span>•</span>
+                <span>${algorithm}</span>
+                <span>•</span>
+                <span>Promedio: ${avgLength} eventos, ${avgTime}s</span>
             </div>
-            ${limitReached ? '<p class="warning-text">Advertencia: Se alcanzó el límite de secuencias configurado.</p>' : ''}
+            ${limitReached ? '<p style="color: #999; font-size: 0.8em; margin-bottom: 12px;">Límite alcanzado</p>' : ''}
         `;
 
         if (sequences.length === 0) {
             html += '<p class="error">No se encontraron secuencias válidas. Verifica que el modelo tenga caminos válidos desde INIT hasta END.</p>';
         } else {
             html += `
-                <div class="export-buttons">
-                    <button class="btn btn-secondary" onclick="SequenceGeneratorDialog.exportResults('csv')">Exportar CSV</button>
-                    <button class="btn btn-secondary" onclick="SequenceGeneratorDialog.exportResults('json')">Exportar JSON</button>
-                    <button class="btn btn-secondary" onclick="SequenceGeneratorDialog.exportResults('txt')">Exportar TXT</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div class="view-toggle">
+                        <button class="toggle-btn active" onclick="SequenceGeneratorDialog.toggleView('compact')">Tabla</button>
+                        <button class="toggle-btn" onclick="SequenceGeneratorDialog.toggleView('detailed')">Detalle</button>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="SequenceGeneratorDialog.exportResults('csv')">CSV</button>
+                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="SequenceGeneratorDialog.exportResults('json')">JSON</button>
+                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="SequenceGeneratorDialog.exportResults('txt')">TXT</button>
+                    </div>
                 </div>
-                <div class="sequences-table-container">
-                    <table class="sequences-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Longitud</th>
-                                <th>Tiempo</th>
-                                <th>Secuencia</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${sequences.slice(0, 100).map(seq => `
+                
+                <div class="sequences-filter">
+                    <input type="text" id="sequenceFilter" placeholder="Buscar evento..." onkeyup="SequenceGeneratorDialog.filterSequences()">
+                    <select id="lengthFilter" onchange="SequenceGeneratorDialog.filterSequences()">
+                        <option value="">Todas las longitudes</option>
+                        ${[...new Set(lengths)].sort((a,b) => a-b).map(len => `<option value="${len}">${len} eventos</option>`).join('')}
+                    </select>
+                </div>
+                
+                <div id="compactView" class="sequences-view active">
+                    <div class="sequences-table-container">
+                        <table class="sequences-table">
+                            <thead>
                                 <tr>
-                                    <td>${seq.id}</td>
-                                    <td>${seq.length}</td>
-                                    <td>${seq.totalTime.toFixed(2)}</td>
-                                    <td class="sequence-cell">${seq.path.map(p => `<span class="event-chip">${p.name}</span>`).join(' → ')}</td>
+                                    <th style="width: 5%;">#</th>
+                                    <th style="width: 8%;">Eventos</th>
+                                    <th style="width: 10%;">Tiempo</th>
+                                    <th style="width: 77%;">Secuencia</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                    ${sequences.length > 100 ? `<p class="info-text">Mostrando 100 de ${sequences.length} secuencias. Exporta para ver todas.</p>` : ''}
+                            </thead>
+                            <tbody id="sequenceTableBody">
+                                ${sequences.slice(0, 100).map(seq => `
+                                    <tr class="sequence-row" data-length="${seq.length}" onclick="SequenceGeneratorDialog.expandSequence(${seq.id})">
+                                        <td>${seq.id}</td>
+                                        <td>${seq.length}</td>
+                                        <td>${seq.totalTime.toFixed(2)}s</td>
+                                        <td class="sequence-cell">${seq.path.map(p => p.name).join(' → ')}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${sequences.length > 100 ? `<p style="color: #999; font-size: 0.8em; margin-top: 12px;">Mostrando 100 de ${sequences.length}. Exporta para ver todas.</p>` : ''}
+                    </div>
+                </div>
+                
+                <div id="detailedView" class="sequences-view">
+                    <div class="sequences-detail-list">
+                        ${sequences.slice(0, 50).map(seq => `
+                            <div class="sequence-detail-card">
+                                <div class="sequence-header" onclick="SequenceGeneratorDialog.toggleSequenceDetail(${seq.id})">
+                                    <span class="sequence-id">#${seq.id}</span>
+                                    <span class="sequence-summary">
+                                        ${seq.path.map(p => p.name).join(' → ')} (${seq.length} eventos, ${seq.totalTime.toFixed(2)}s)
+                                    </span>
+                                    <span class="expand-icon">▼</span>
+                                </div>
+                                <div class="sequence-detail" id="detail-${seq.id}" style="display: none;">
+                                    <div class="sequence-timeline">
+                                        ${seq.path.map((event, idx) => `
+                                            <div class="timeline-item">
+                                                <div class="timeline-marker">${idx + 1}</div>
+                                                <div class="timeline-content">
+                                                    <h4>${event.name}</h4>
+                                                    <p class="event-time">t = <strong>${event.time.toFixed(2)}s</strong></p>
+                                                    ${idx > 0 ? `<p class="event-delta">Δt = <strong>${(event.time - seq.path[idx-1].time).toFixed(2)}s</strong></p>` : ''}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="sequence-stats">
+                                        <div class="stat-mini">
+                                            <span class="label">Total</span>
+                                            <span class="value">${seq.totalTime.toFixed(2)}s</span>
+                                        </div>
+                                        <div class="stat-mini">
+                                            <span class="label">Eventos</span>
+                                            <span class="value">${seq.length}</span>
+                                        </div>
+                                        <div class="stat-mini">
+                                            <span class="label">Promedio</span>
+                                            <span class="value">${(seq.totalTime / seq.length).toFixed(2)}s</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${sequences.length > 50 ? `<p style="color: #999; font-size: 0.8em; margin-top: 12px;">Mostrando 50 de ${sequences.length}. Exporta para ver todas.</p>` : ''}
+                    </div>
                 </div>
             `;
         }
 
         document.getElementById('resultsContent').innerHTML = html;
         this._lastResult = result;
+        this._currentView = 'compact';
+    },
+    
+    toggleView(view) {
+        // Cambiar vista (comprimida vs detallada)
+        const compactView = document.getElementById('compactView');
+        const detailedView = document.getElementById('detailedView');
+        const toggleBtns = document.querySelectorAll('.view-toggle .toggle-btn');
+        
+        toggleBtns.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        if (view === 'compact') {
+            compactView.classList.add('active');
+            detailedView.classList.remove('active');
+        } else {
+            compactView.classList.remove('active');
+            detailedView.classList.add('active');
+        }
+        
+        this._currentView = view;
+    },
+    
+    toggleSequenceDetail(seqId) {
+        // Expandir/contraer detalle de una secuencia
+        const detail = document.getElementById(`detail-${seqId}`);
+        const header = detail.previousElementSibling;
+        const icon = header.querySelector('.expand-icon');
+        
+        if (detail.style.display === 'none') {
+            detail.style.display = 'block';
+            icon.textContent = '▲';
+        } else {
+            detail.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    },
+    
+    filterSequences() {
+        // Filtrar secuencias por búsqueda y longitud
+        const filterText = document.getElementById('sequenceFilter')?.value.toLowerCase() || '';
+        const lengthFilter = document.getElementById('lengthFilter')?.value || '';
+        
+        if (this._currentView === 'compact') {
+            const rows = document.querySelectorAll('.sequence-row');
+            rows.forEach(row => {
+                const sequenceText = row.textContent.toLowerCase();
+                const rowLength = row.dataset.length;
+                const matchesText = sequenceText.includes(filterText);
+                const matchesLength = lengthFilter === '' || rowLength === lengthFilter;
+                
+                row.style.display = (matchesText && matchesLength) ? '' : 'none';
+            });
+        }
+    },
+    
+    expandSequence(seqId) {
+        // Expandir secuencia desde la vista comprimida
+        if (this._currentView === 'compact') {
+            // Cambiar a vista detallada y expandir esa secuencia
+            this.toggleView('detailed');
+            setTimeout(() => {
+                this.toggleSequenceDetail(seqId);
+                const card = document.getElementById(`detail-${seqId}`).closest('.sequence-detail-card');
+                card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
     },
 
     exportResults(format) {
