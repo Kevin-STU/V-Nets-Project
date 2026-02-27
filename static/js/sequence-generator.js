@@ -319,7 +319,7 @@ const SequenceGenerator = {
     exportToCSV(sequences) {
         const lines = ['ID,Longitud,Tiempo_Total,Secuencia'];
         sequences.forEach(seq => {
-            const seqStr = seq.path.map(p => `${p.name}(${p.time})`).join(' -> ');
+            const seqStr = seq.path.map(p => `${p.name}, ${p.time}`).join('  ');
             lines.push(`${seq.id},${seq.length},${seq.totalTime},"${seqStr}"`);
         });
         return lines.join('\n');
@@ -333,7 +333,7 @@ const SequenceGenerator = {
         const lines = ['=== Secuencias Generadas ===\n'];
         sequences.forEach(seq => {
             lines.push(`Secuencia ${seq.id} (longitud: ${seq.length}, tiempo: ${seq.totalTime})`);
-            lines.push(seq.path.map(p => `  ${p.name} (t=${p.time})`).join('\n'));
+            lines.push(seq.path.map(p => `${p.name}, ${p.time}`).join('  '));
             lines.push('');
         });
         return lines.join('\n');
@@ -603,21 +603,25 @@ const SequenceGeneratorDialog = {
                         <table class="sequences-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 5%;">#</th>
-                                    <th style="width: 8%;">Eventos</th>
-                                    <th style="width: 10%;">Tiempo</th>
-                                    <th style="width: 77%;">Secuencia</th>
+                                    <th style="width: 4%;">#</th>
+                                    <th style="width: 7%;">Eventos</th>
+                                    <th style="width: 9%;">Tiempo</th>
+                                    <th style="width: 74%;">Secuencia</th>
+                                    <th style="width: 6%;"></th>
                                 </tr>
                             </thead>
                             <tbody id="sequenceTableBody">
-                                ${sequences.slice(0, 100).map(seq => `
-                                    <tr class="sequence-row" data-length="${seq.length}" onclick="SequenceGeneratorDialog.expandSequence(${seq.id})">
+                                ${sequences.slice(0, 100).map(seq => {
+                                    const seqText = seq.path.map(p => `${p.name}, ${p.time}`).join('  ');
+                                    return `
+                                    <tr class="sequence-row" data-length="${seq.length}">
                                         <td>${seq.id}</td>
                                         <td>${seq.length}</td>
                                         <td>${seq.totalTime.toFixed(2)}s</td>
-                                        <td class="sequence-cell">${seq.path.map(p => p.name).join(' → ')}</td>
-                                    </tr>
-                                `).join('')}
+                                        <td class="sequence-cell">${seqText}</td>
+                                        <td><button class="copy-seq-btn" title="Copiar secuencia" onclick="SequenceGeneratorDialog.copySequence(event, '${seqText}')">⎘</button></td>
+                                    </tr>`;
+                                }).join('')}
                             </tbody>
                         </table>
                         ${sequences.length > 100 ? `<p style="color: #999; font-size: 0.8em; margin-top: 12px;">Mostrando 100 de ${sequences.length}. Exporta para ver todas.</p>` : ''}
@@ -631,8 +635,9 @@ const SequenceGeneratorDialog = {
                                 <div class="sequence-header" onclick="SequenceGeneratorDialog.toggleSequenceDetail(${seq.id})">
                                     <span class="sequence-id">#${seq.id}</span>
                                     <span class="sequence-summary">
-                                        ${seq.path.map(p => p.name).join(' → ')} (${seq.length} eventos, ${seq.totalTime.toFixed(2)}s)
+                                        ${seq.path.map(p => `${p.name}, ${p.time}`).join('  ')} (${seq.length} eventos, ${seq.totalTime.toFixed(2)}s)
                                     </span>
+                                    <button class="copy-seq-btn" title="Copiar secuencia" onclick="SequenceGeneratorDialog.copySequence(event, '${seq.path.map(p => `${p.name}, ${p.time}`).join('  ')}')">⎘</button>
                                     <span class="expand-icon">▼</span>
                                 </div>
                                 <div class="sequence-detail" id="detail-${seq.id}" style="display: none;">
@@ -696,6 +701,19 @@ const SequenceGeneratorDialog = {
         this._currentView = view;
     },
     
+    copySequence(event, text) {
+        event.stopPropagation();
+        const btn = event.currentTarget;
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = '✓';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = '⎘';
+                btn.classList.remove('copied');
+            }, 1500);
+        });
+    },
+
     toggleSequenceDetail(seqId) {
         // Expandir/contraer detalle de una secuencia
         const detail = document.getElementById(`detail-${seqId}`);

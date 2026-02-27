@@ -1824,26 +1824,37 @@
 
 .sequence-detail {
     padding: 12px;
+    overflow: hidden;
 }
 
-/* Línea de Tiempo Minimalista */
+/* Línea de Tiempo Horizontal */
 .sequence-timeline {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding: 12px 4px 8px 4px;
     margin-bottom: 12px;
+    gap: 0;
 }
 
 .timeline-item {
     display: flex;
-    margin-bottom: 12px;
+    flex-direction: column;
+    align-items: center;
     position: relative;
+    min-width: 80px;
+    flex-shrink: 0;
 }
 
+/* Línea horizontal entre eventos */
 .timeline-item:not(:last-child)::after {
     content: '';
     position: absolute;
-    left: 14px;
-    top: 30px;
-    width: 1px;
-    height: calc(100% + 8px);
+    top: 13px;
+    left: calc(50% + 14px);
+    width: calc(100% - 28px);
+    height: 2px;
     background: #e0e0e0;
 }
 
@@ -1860,26 +1871,29 @@
     font-weight: 600;
     font-size: 0.75em;
     z-index: 10;
+    position: relative;
 }
 
 .timeline-content {
-    flex: 1;
-    margin-left: 12px;
-    padding: 8px 0;
+    margin-top: 8px;
+    text-align: center;
+    padding: 0 4px;
 }
 
 .timeline-content h4 {
     margin: 0 0 4px 0;
     color: #333;
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .event-time,
 .event-delta {
     margin: 2px 0;
-    font-size: 0.8em;
+    font-size: 0.75em;
     color: #666;
+    white-space: nowrap;
 }
 
 .event-time strong,
@@ -1887,6 +1901,36 @@
     font-family: 'Courier New', monospace;
     color: #333;
     font-weight: 600;
+}
+
+/* Botón copiar secuencia */
+.copy-seq-btn {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 2px 6px;
+    line-height: 1;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    width: auto;
+    margin: 0;
+}
+
+.copy-seq-btn:hover {
+    border-color: #3498db;
+    color: #3498db;
+    background: #f0f7ff;
+    transform: none;
+    box-shadow: none;
+}
+
+.copy-seq-btn.copied {
+    border-color: #27ae60;
+    color: #27ae60;
+    background: #f0fff4;
 }
 
 /* Estadísticas Limpias */
