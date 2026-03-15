@@ -290,16 +290,21 @@ class VNetCanvas {
         // Nota: El manejo de mouseup en modo conexión se hace en setupEventGraphicHandlers
         // para cada grupo de evento, NO aquí en el stage
 
-        // Mouse move for connection preview
+        // Mouse move for connection preview (todo en coordenadas de capa para que coincida con zoom)
         this.stage.on('mousemove', (e) => {
             if (this.isConnecting && this.tempLine) {
                 const pos = this.stage.getPointerPosition();
-                const sourcePos = this.connectionSource.getAbsolutePosition();
+                if (!pos) return;
+                // Convertir puntero (pantalla) a coordenadas de contenido del stage
+                const scaleX = this.stage.scaleX();
+                const scaleY = this.stage.scaleY();
+                const stageX = (pos.x - this.stage.x()) / scaleX;
+                const stageY = (pos.y - this.stage.y()) / scaleY;
                 const sourceCenter = {
-                    x: sourcePos.x + 40,
-                    y: sourcePos.y + 30
+                    x: this.connectionSource.x() + 40,
+                    y: this.connectionSource.y() + 30
                 };
-                this.tempLine.points([sourceCenter.x, sourceCenter.y, pos.x, pos.y]);
+                this.tempLine.points([sourceCenter.x, sourceCenter.y, stageX, stageY]);
                 this.tempLayer.batchDraw();
             }
         });
@@ -637,11 +642,9 @@ class VNetCanvas {
         }
         this.eventsLayer.batchDraw();
 
-        // Crear línea temporal desde el centro del evento
-        // Usar getAbsolutePosition() que ya maneja zoom/pan correctamente
-        const pos = sourceGroup.getAbsolutePosition();
-        const centerX = pos.x + 40;
-        const centerY = pos.y + 30;
+        // Crear línea temporal desde el centro del evento (coordenadas de capa)
+        const centerX = sourceGroup.x() + 40;
+        const centerY = sourceGroup.y() + 30;
 
         this.tempLine = new Konva.Arrow({
             points: [centerX, centerY, centerX, centerY],
@@ -797,15 +800,15 @@ class VNetCanvas {
                 return group;
             }
 
-            const sourcePos = sourceGraphic.getAbsolutePosition();
-            const targetPos = targetGraphic.getAbsolutePosition();
+            // Posición en la capa (no getAbsolutePosition) para que zoom/pan no desalinee las flechas
+            const centerOffsetX = 40;
+            const centerOffsetY = 30;
+            const startX = sourceGraphic.x() + centerOffsetX;
+            const startY = sourceGraphic.y() + centerOffsetY;
+            const endX = targetGraphic.x() + centerOffsetX;
+            const endY = targetGraphic.y() + centerOffsetY;
 
-            console.log('📊 Posiciones:', { sourcePos, targetPos });
-
-        const startX = sourcePos.x + 40;
-        const startY = sourcePos.y + 30;
-        const endX = targetPos.x + 40;
-        const endY = targetPos.y + 30;
+            console.log('📊 Posiciones:', { startX, startY, endX, endY });
 
         // Calculate control points for curved line
         const midX = (startX + endX) / 2;
@@ -1165,17 +1168,20 @@ class VNetCanvas {
     }
 
     // Actualizar solo posiciones (cuando se arrastra un evento)
+    // Usar posición en la capa (.x()/.y()) para evitar desfase con zoom/pan del stage
     updateConnectionPosition(connection) {
         const group = connection.graphicItem;
         if (!group) return;
 
-        const sourcePos = connection.source.graphicItem.getAbsolutePosition();
-        const targetPos = connection.target.graphicItem.getAbsolutePosition();
+        const sourceG = connection.source.graphicItem;
+        const targetG = connection.target.graphicItem;
+        const centerOffsetX = 40;
+        const centerOffsetY = 30;
 
-        const startX = sourcePos.x + 40;
-        const startY = sourcePos.y + 30;
-        const endX = targetPos.x + 40;
-        const endY = targetPos.y + 30;
+        const startX = sourceG.x() + centerOffsetX;
+        const startY = sourceG.y() + centerOffsetY;
+        const endX = targetG.x() + centerOffsetX;
+        const endY = targetG.y() + centerOffsetY;
 
         // Update arrow points
         group.arrowNode.points(this.calculateCurvePoints(startX, startY, endX, endY));
