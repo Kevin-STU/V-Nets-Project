@@ -25,7 +25,7 @@ class VNetMenuBar {
                         <div class="menu-option" data-action="new">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span>
                             <span class="menu-label">Nuevo</span>
-                            <span class="menu-shortcut">Ctrl+N</span>
+                            <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-option" data-action="open">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
@@ -41,7 +41,7 @@ class VNetMenuBar {
                         <div class="menu-option" data-action="saveAs">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
                             <span class="menu-label">Guardar como...</span>
-                            <span class="menu-shortcut">Ctrl+Shift+S</span>
+                            <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="exportImage">
@@ -63,12 +63,12 @@ class VNetMenuBar {
                         <div class="menu-option" data-action="undo" id="menuUndo">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg></span>
                             <span class="menu-label">Deshacer</span>
-                            <span class="menu-shortcut">Ctrl+Z</span>
+                            <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-option" data-action="redo" id="menuRedo">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg></span>
                             <span class="menu-label">Rehacer</span>
-                            <span class="menu-shortcut">Ctrl+Y</span>
+                            <span class="menu-shortcut"></span>
                         </div>
                         <div class="menu-separator"></div>
                         <div class="menu-option" data-action="delete">
@@ -316,12 +316,8 @@ class VNetMenuBar {
         const html = `
             <h4>Atajos de Teclado</h4>
             <table class="shortcuts-table">
-                <tr><td><kbd>Ctrl+N</kbd></td><td>Nuevo archivo</td></tr>
                 <tr><td><kbd>Ctrl+O</kbd></td><td>Abrir archivo</td></tr>
                 <tr><td><kbd>Ctrl+S</kbd></td><td>Guardar</td></tr>
-                <tr><td><kbd>Ctrl+Shift+S</kbd></td><td>Guardar como</td></tr>
-                <tr><td><kbd>Ctrl+Z</kbd></td><td>Deshacer</td></tr>
-                <tr><td><kbd>Ctrl+Y</kbd></td><td>Rehacer</td></tr>
                 <tr><td><kbd>Delete</kbd></td><td>Eliminar selección</td></tr>
                 <tr><td><kbd>V</kbd></td><td>Herramienta Seleccionar</td></tr>
                 <tr><td><kbd>C</kbd></td><td>Herramienta Conectar</td></tr>
